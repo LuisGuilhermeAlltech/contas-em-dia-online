@@ -51,7 +51,7 @@ export const Sidebar = ({
           {sidebarOpen && (
             <div className="flex items-center gap-2">
               <Building2 className="h-8 w-8 text-blue-600" />
-              <span className="font-bold text-lg text-gray-900">FinanceControl</span>
+              <span className="font-bold text-lg text-gray-900">Contas Pro Grupo L.G</span>
             </div>
           )}
           <Button
