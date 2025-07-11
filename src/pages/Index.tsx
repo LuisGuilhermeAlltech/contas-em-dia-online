@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Dashboard } from "@/components/Dashboard";
@@ -11,7 +10,7 @@ import { Menu } from "lucide-react";
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedEmpresa, setSelectedEmpresa] = useState("empresa1");
+  const [selectedEmpresa, setSelectedEmpresa] = useState("grupo-lider");
 
   const renderContent = () => {
     switch (activeMenu) {

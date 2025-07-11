@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,9 +36,10 @@ export const Sidebar = ({
   ];
 
   const empresas = [
-    { id: "empresa1", name: "Empresa Principal" },
-    { id: "empresa2", name: "Filial Norte" },
-    { id: "empresa3", name: "Filial Sul" },
+    { id: "grupo-lider", name: "Grupo Lider" },
+    { id: "alltech-matriz", name: "Alltech Matriz" },
+    { id: "alltech-filial", name: "Alltech Filial" },
+    { id: "luis-guilherme", name: "Luis Guilherme" },
   ];
 
   return (
