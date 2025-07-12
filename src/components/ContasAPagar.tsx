@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,11 +69,12 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   });
 
   const handleSave = () => {
-    console.log("Função handleSave chamada");
+    console.log("Função handleSave iniciada");
     console.log("Dados do formulário:", formData);
     
-    // Validação melhorada
-    if (!formData.descricao || formData.descricao.trim() === "") {
+    // Validação dos campos obrigatórios apenas
+    if (!formData.descricao?.trim()) {
+      console.log("Erro: Descrição vazia");
       toast({
         title: "Erro de validação",
         description: "A descrição é obrigatória",
@@ -83,7 +83,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       return;
     }
 
-    if (!formData.valorTotal || formData.valorTotal.trim() === "") {
+    if (!formData.valorTotal?.trim()) {
+      console.log("Erro: Valor total vazio");
       toast({
         title: "Erro de validação",
         description: "O valor total é obrigatório",
@@ -92,7 +93,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       return;
     }
 
-    if (!formData.vencimento || formData.vencimento.trim() === "") {
+    if (!formData.vencimento?.trim()) {
+      console.log("Erro: Data de vencimento vazia");
       toast({
         title: "Erro de validação",
         description: "A data de vencimento é obrigatória",
@@ -101,10 +103,12 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       return;
     }
 
+    // Conversão e validação do valor
     const valorTotal = parseFloat(formData.valorTotal.replace(',', '.'));
     console.log("Valor convertido:", valorTotal);
     
     if (isNaN(valorTotal) || valorTotal <= 0) {
+      console.log("Erro: Valor inválido");
       toast({
         title: "Erro de validação",
         description: "O valor deve ser um número maior que zero",
@@ -113,7 +117,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       return;
     }
 
-    // Criar nova conta
+    // Determinar status baseado na data de vencimento
     const dataVencimento = new Date(formData.vencimento);
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
@@ -128,14 +132,15 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       status: dataVencimento < hoje ? "vencida" : "pendente",
       empresa: selectedEmpresa,
       pagamentos: [],
-      arquivo: formData.arquivo
+      arquivo: formData.arquivo || undefined // Campo opcional - só salva se tiver valor
     };
 
-    console.log("Nova conta criada:", novaConta);
+    console.log("Nova conta a ser criada:", novaConta);
     
+    // Adicionar nova conta ao estado
     setContas(contasAtuais => {
       const novasContas = [...contasAtuais, novaConta];
-      console.log("Contas atualizadas:", novasContas);
+      console.log("Lista de contas atualizada:", novasContas);
       return novasContas;
     });
 
@@ -156,7 +161,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       description: "Conta cadastrada com sucesso",
     });
 
-    console.log("Processo de salvamento concluído");
+    console.log("Conta cadastrada com sucesso!");
   };
 
   const handlePagamento = () => {
@@ -261,12 +266,19 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     return matchEmpresa && matchSearch && matchStatus;
   });
 
-  // Validação do formulário para o botão
-  const isFormValid = formData.descricao.trim() !== "" && 
-                     formData.valorTotal.trim() !== "" && 
-                     formData.vencimento.trim() !== "";
+  // Validação simplificada - apenas campos obrigatórios
+  const isFormValid = Boolean(
+    formData.descricao?.trim() && 
+    formData.valorTotal?.trim() && 
+    formData.vencimento?.trim()
+  );
 
-  console.log("Estado do formulário:", { formData, isFormValid });
+  console.log("Validação do formulário:", { 
+    descricao: !!formData.descricao?.trim(),
+    valorTotal: !!formData.valorTotal?.trim(),
+    vencimento: !!formData.vencimento?.trim(),
+    isFormValid 
+  });
 
   return (
     <div className="space-y-6">
@@ -291,8 +303,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   placeholder="Ex: Nota 234 - José Material de Construção" 
                   value={formData.descricao}
                   onChange={(e) => {
-                    console.log("Descrição alterada:", e.target.value);
-                    setFormData({...formData, descricao: e.target.value});
+                    console.log("Descrição alterada para:", e.target.value);
+                    setFormData(prev => ({...prev, descricao: e.target.value}));
                   }}
                   className="min-h-20"
                 />
@@ -306,8 +318,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   placeholder="0,00" 
                   value={formData.valorTotal}
                   onChange={(e) => {
-                    console.log("Valor alterado:", e.target.value);
-                    setFormData({...formData, valorTotal: e.target.value});
+                    console.log("Valor alterado para:", e.target.value);
+                    setFormData(prev => ({...prev, valorTotal: e.target.value}));
                   }}
                 />
               </div>
@@ -318,8 +330,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   type="date" 
                   value={formData.vencimento}
                   onChange={(e) => {
-                    console.log("Vencimento alterado:", e.target.value);
-                    setFormData({...formData, vencimento: e.target.value});
+                    console.log("Vencimento alterado para:", e.target.value);
+                    setFormData(prev => ({...prev, vencimento: e.target.value}));
                   }}
                 />
               </div>
@@ -332,22 +344,21 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                     accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      console.log("Arquivo selecionado:", file?.name);
-                      setFormData({...formData, arquivo: file?.name || ""});
+                      const fileName = file?.name || "";
+                      console.log("Arquivo selecionado:", fileName);
+                      setFormData(prev => ({...prev, arquivo: fileName}));
                     }}
                     className="flex-1"
                   />
                   <Paperclip className="h-4 w-4 text-gray-400" />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Este campo é totalmente opcional</p>
               </div>
               <div className="flex gap-2 pt-4">
                 <Button 
                   type="button"
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  onClick={() => {
-                    console.log("Botão Salvar clicado");
-                    handleSave();
-                  }}
+                  onClick={handleSave}
                   disabled={!isFormValid}
                 >
                   Salvar
