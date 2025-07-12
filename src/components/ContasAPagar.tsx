@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   AlertCircle,
   DollarSign,
-  History
+  History,
+  Paperclip
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -36,16 +37,14 @@ interface Pagamento {
 
 interface Conta {
   id: number;
-  nome: string;
-  fornecedor: string;
+  descricao: string;
   valorTotal: number;
   valorPago: number;
   vencimento: string;
   status: "pendente" | "pago" | "vencida";
-  categoria: string;
-  observacao?: string;
   empresa: string;
   pagamentos: Pagamento[];
+  arquivo?: string;
 }
 
 export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
@@ -57,12 +56,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   const [contas, setContas] = useState<Conta[]>([]);
   
   const [formData, setFormData] = useState({
-    nome: "",
-    fornecedor: "",
+    descricao: "",
     valorTotal: "",
     vencimento: "",
-    categoria: "",
-    observacao: ""
+    arquivo: ""
   });
 
   const [pagamentoData, setPagamentoData] = useState({
@@ -71,38 +68,57 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   });
 
   const handleSave = () => {
-    if (!formData.nome.trim() || !formData.valorTotal || !formData.vencimento) return;
+    if (!formData.descricao.trim() || !formData.valorTotal || !formData.vencimento) {
+      alert("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    const valorTotal = parseFloat(formData.valorTotal);
+    if (isNaN(valorTotal) || valorTotal <= 0) {
+      alert("Valor deve ser maior que zero");
+      return;
+    }
 
     const novaConta: Conta = {
       id: Date.now(),
-      nome: formData.nome,
-      fornecedor: formData.fornecedor,
-      valorTotal: parseFloat(formData.valorTotal),
+      descricao: formData.descricao,
+      valorTotal: valorTotal,
       valorPago: 0,
       vencimento: formData.vencimento,
       status: new Date(formData.vencimento) < new Date() ? "vencida" : "pendente",
-      categoria: formData.categoria,
-      observacao: formData.observacao,
       empresa: selectedEmpresa,
-      pagamentos: []
+      pagamentos: [],
+      arquivo: formData.arquivo
     };
 
     setContas([...contas, novaConta]);
     setFormData({
-      nome: "",
-      fornecedor: "",
+      descricao: "",
       valorTotal: "",
       vencimento: "",
-      categoria: "",
-      observacao: ""
+      arquivo: ""
     });
     setIsDialogOpen(false);
   };
 
   const handlePagamento = () => {
-    if (!contaParaPagamento || !pagamentoData.valor) return;
+    if (!contaParaPagamento || !pagamentoData.valor) {
+      alert("Informe o valor do pagamento");
+      return;
+    }
 
     const valorPagamento = parseFloat(pagamentoData.valor);
+    if (isNaN(valorPagamento) || valorPagamento <= 0) {
+      alert("Valor do pagamento deve ser maior que zero");
+      return;
+    }
+
+    const saldoRestante = contaParaPagamento.valorTotal - contaParaPagamento.valorPago;
+    if (valorPagamento > saldoRestante) {
+      alert(`Valor não pode ser maior que o saldo restante: R$ ${saldoRestante.toFixed(2)}`);
+      return;
+    }
+
     const novoPagamento: Pagamento = {
       id: Date.now(),
       valor: valorPagamento,
@@ -130,6 +146,12 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     setContaParaPagamento(null);
   };
 
+  const handleDelete = (contaId: number) => {
+    if (confirm("Tem certeza que deseja excluir esta conta?")) {
+      setContas(contas.filter(conta => conta.id !== contaId));
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pago":
@@ -154,8 +176,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
 
   const filteredContas = contas.filter(conta => {
     const matchEmpresa = conta.empresa === selectedEmpresa;
-    const matchSearch = conta.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       conta.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchSearch = conta.descricao.toLowerCase().includes(searchTerm.toLowerCase());
     const matchStatus = statusFilter === "all" || conta.status === statusFilter;
     
     return matchEmpresa && matchSearch && matchStatus;
@@ -178,21 +199,13 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="nome">Nome da Conta *</Label>
-                <Input 
-                  id="nome" 
-                  placeholder="Ex: Energia Elétrica" 
-                  value={formData.nome}
-                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="fornecedor">Fornecedor</Label>
-                <Input 
-                  id="fornecedor" 
-                  placeholder="Nome do fornecedor" 
-                  value={formData.fornecedor}
-                  onChange={(e) => setFormData({...formData, fornecedor: e.target.value})}
+                <Label htmlFor="descricao">Descrição da Conta *</Label>
+                <Textarea 
+                  id="descricao" 
+                  placeholder="Ex: Nota 234 - José Material de Construção" 
+                  value={formData.descricao}
+                  onChange={(e) => setFormData({...formData, descricao: e.target.value})}
+                  className="min-h-20"
                 />
               </div>
               <div>
@@ -216,32 +229,42 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                 />
               </div>
               <div>
-                <Label htmlFor="categoria">Categoria</Label>
-                <Input 
-                  id="categoria" 
-                  placeholder="Ex: Utilidades, Material, Serviços" 
-                  value={formData.categoria}
-                  onChange={(e) => setFormData({...formData, categoria: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="observacoes">Observações</Label>
-                <Textarea 
-                  id="observacoes" 
-                  placeholder="Observações adicionais..." 
-                  value={formData.observacao}
-                  onChange={(e) => setFormData({...formData, observacao: e.target.value})}
-                />
+                <Label htmlFor="arquivo">Anexar Arquivo (Opcional)</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    id="arquivo" 
+                    type="file" 
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      setFormData({...formData, arquivo: file?.name || ""});
+                    }}
+                    className="flex-1"
+                  />
+                  <Paperclip className="h-4 w-4 text-gray-400" />
+                </div>
               </div>
               <div className="flex gap-2 pt-4">
                 <Button 
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
                   onClick={handleSave}
-                  disabled={!formData.nome.trim() || !formData.valorTotal || !formData.vencimento}
+                  disabled={!formData.descricao.trim() || !formData.valorTotal || !formData.vencimento}
                 >
                   Salvar
                 </Button>
-                <Button variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
+                <Button 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => {
+                    setIsDialogOpen(false);
+                    setFormData({
+                      descricao: "",
+                      valorTotal: "",
+                      vencimento: "",
+                      arquivo: ""
+                    });
+                  }}
+                >
                   Cancelar
                 </Button>
               </div>
@@ -259,7 +282,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
           {contaParaPagamento && (
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="font-medium">{contaParaPagamento.nome}</p>
+                <p className="font-medium">{contaParaPagamento.descricao}</p>
                 <p className="text-sm text-gray-600">Valor Total: R$ {contaParaPagamento.valorTotal.toFixed(2)}</p>
                 <p className="text-sm text-gray-600">Já Pago: R$ {contaParaPagamento.valorPago.toFixed(2)}</p>
                 <p className="text-sm font-medium text-red-600">
@@ -295,7 +318,14 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                 >
                   Registrar Pagamento
                 </Button>
-                <Button variant="outline" className="flex-1" onClick={() => setIsPagamentoDialogOpen(false)}>
+                <Button 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => {
+                    setIsPagamentoDialogOpen(false);
+                    setPagamentoData({ valor: "", observacao: "" });
+                  }}
+                >
                   Cancelar
                 </Button>
               </div>
@@ -355,12 +385,17 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   <div className="flex items-center gap-4">
                     {getStatusIcon(conta.status)}
                     <div>
-                      <h3 className="font-medium text-gray-900">{conta.nome}</h3>
-                      <p className="text-sm text-gray-600">{conta.fornecedor}</p>
-                      {conta.categoria && <p className="text-xs text-gray-500">Categoria: {conta.categoria}</p>}
+                      <h3 className="font-medium text-gray-900">{conta.descricao}</h3>
+                      <p className="text-sm text-gray-600">Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}</p>
                       {conta.valorPago > 0 && conta.status !== "pago" && (
                         <p className="text-xs text-blue-600">
                           Pago: R$ {conta.valorPago.toFixed(2)} | Saldo: R$ {(conta.valorTotal - conta.valorPago).toFixed(2)}
+                        </p>
+                      )}
+                      {conta.arquivo && (
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <Paperclip className="h-3 w-3" />
+                          {conta.arquivo}
                         </p>
                       )}
                     </div>
@@ -371,7 +406,6 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                       <p className="font-bold text-lg text-gray-900">
                         R$ {conta.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
-                      <p className="text-sm text-gray-600">Venc: {conta.vencimento}</p>
                     </div>
                     
                     {getStatusBadge(conta.status)}
@@ -405,10 +439,13 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                         {conta.pagamentos.length > 0 && (
                           <DropdownMenuItem>
                             <History className="h-4 w-4 mr-2" />
-                            Histórico de Pagamentos
+                            Histórico ({conta.pagamentos.length} pagamentos)
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem className="text-red-600">
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={() => handleDelete(conta.id)}
+                        >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Excluir
                         </DropdownMenuItem>

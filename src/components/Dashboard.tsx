@@ -17,7 +17,8 @@ interface DashboardProps {
 }
 
 export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
-  // Dados zerados - o sistema começa limpo
+  // Para demonstração, usando dados zerados - em uma implementação real
+  // estes dados viriam de um contexto compartilhado ou estado global
   const dashboardData = {
     totalAPagar: 0,
     proximaSemana: 0,
@@ -27,11 +28,11 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
     contasPendentes: 0
   };
 
-  const contasProximas: any[] = []; // Array vazio - sem dados de exemplo
+  const contasProximas: any[] = [];
 
   const getNomeEmpresa = (id: string) => {
     const empresas: { [key: string]: string } = {
-      "grupo-lider": "Grupo Lider",
+      "grupo-lider": "Grupo Líder",
       "alltech-matriz": "Alltech Matriz", 
       "alltech-filial": "Alltech Filial",
       "luis-guilherme": "Luis Guilherme"
@@ -46,10 +47,6 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
           <h2 className="text-3xl font-bold text-gray-900">Dashboard Financeiro</h2>
           <p className="text-gray-600 mt-1">Empresa: {getNomeEmpresa(selectedEmpresa)}</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Conta
-        </Button>
       </div>
 
       {/* Cards de Resumo */}
@@ -63,6 +60,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             <div className="text-2xl font-bold text-red-600">
               R$ {dashboardData.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
+            <p className="text-xs text-gray-500 mt-1">Saldo em aberto</p>
           </CardContent>
         </Card>
 
@@ -75,6 +73,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             <div className="text-2xl font-bold text-orange-600">
               R$ {dashboardData.proximaSemana.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
+            <p className="text-xs text-gray-500 mt-1">Vencimento em 7 dias</p>
           </CardContent>
         </Card>
 
@@ -87,6 +86,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             <div className="text-2xl font-bold text-blue-600">
               R$ {dashboardData.mesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
+            <p className="text-xs text-gray-500 mt-1">A vencer este mês</p>
           </CardContent>
         </Card>
 
@@ -99,6 +99,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             <div className="text-2xl font-bold text-green-600">
               {dashboardData.contasPagas}
             </div>
+            <p className="text-xs text-gray-500 mt-1">Quitadas</p>
           </CardContent>
         </Card>
       </div>
@@ -116,6 +117,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             <div className="text-3xl font-bold text-red-600">
               {dashboardData.contasVencidas}
             </div>
+            <p className="text-sm text-red-600 mt-1">Requer atenção imediata</p>
           </CardContent>
         </Card>
 
@@ -130,6 +132,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             <div className="text-3xl font-bold text-orange-600">
               {dashboardData.contasPendentes}
             </div>
+            <p className="text-sm text-orange-600 mt-1">Aguardando pagamento</p>
           </CardContent>
         </Card>
 
@@ -144,6 +147,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             <div className="text-3xl font-bold text-green-600">
               {dashboardData.contasPagas}
             </div>
+            <p className="text-sm text-green-600 mt-1">Quitadas com sucesso</p>
           </CardContent>
         </Card>
       </div>
@@ -151,7 +155,8 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       {/* Contas Próximas do Vencimento */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-gray-900">
+          <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
             Contas Próximas do Vencimento
           </CardTitle>
         </CardHeader>
@@ -169,7 +174,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
               {contasProximas.map((conta) => (
                 <div key={conta.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">{conta.fornecedor}</p>
+                    <p className="font-medium text-gray-900">{conta.descricao}</p>
                     <p className="text-sm text-gray-600">Vencimento: {conta.vencimento}</p>
                   </div>
                   <div className="text-right">
@@ -184,6 +189,32 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Dicas de Uso */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardHeader>
+          <CardTitle className="text-blue-700 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Dicas para Organização
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-semibold text-blue-800 mb-2">Cadastro Rápido</h4>
+              <p className="text-sm text-blue-700">
+                Use descrições claras como "Nota 234 - José Material" para identificar facilmente suas contas.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-blue-800 mb-2">Pagamentos Parciais</h4>
+              <p className="text-sm text-blue-700">
+                Registre pagamentos parciais conforme sua disponibilidade financeira.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
