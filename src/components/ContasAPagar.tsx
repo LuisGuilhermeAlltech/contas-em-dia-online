@@ -69,99 +69,116 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   });
 
   const handleSave = () => {
-    console.log("Função handleSave iniciada");
+    console.log("=== INÍCIO DA FUNÇÃO SALVAR ===");
     console.log("Dados do formulário:", formData);
+    console.log("Empresa selecionada:", selectedEmpresa);
     
-    // Validação dos campos obrigatórios apenas
-    if (!formData.descricao?.trim()) {
-      console.log("Erro: Descrição vazia");
+    try {
+      // Validação simples dos campos obrigatórios
+      if (!formData.descricao || formData.descricao.trim() === "") {
+        console.log("❌ ERRO: Descrição vazia");
+        toast({
+          title: "Campo obrigatório",
+          description: "Por favor, preencha a descrição da conta",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!formData.valorTotal || formData.valorTotal.trim() === "") {
+        console.log("❌ ERRO: Valor total vazio");
+        toast({
+          title: "Campo obrigatório",
+          description: "Por favor, preencha o valor total",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!formData.vencimento || formData.vencimento.trim() === "") {
+        console.log("❌ ERRO: Data de vencimento vazia");
+        toast({
+          title: "Campo obrigatório",
+          description: "Por favor, selecione a data de vencimento",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Conversão do valor
+      const valorNumerico = parseFloat(formData.valorTotal.replace(',', '.'));
+      console.log("Valor convertido:", valorNumerico);
+      
+      if (isNaN(valorNumerico) || valorNumerico <= 0) {
+        console.log("❌ ERRO: Valor inválido:", valorNumerico);
+        toast({
+          title: "Valor inválido",
+          description: "Por favor, insira um valor válido maior que zero",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Determinar status baseado na data
+      const dataVencimento = new Date(formData.vencimento);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      dataVencimento.setHours(0, 0, 0, 0);
+      
+      const status = dataVencimento < hoje ? "vencida" : "pendente";
+      console.log("Status calculado:", status);
+
+      // Criar nova conta
+      const novaConta: Conta = {
+        id: Date.now(),
+        descricao: formData.descricao.trim(),
+        valorTotal: valorNumerico,
+        valorPago: 0,
+        vencimento: formData.vencimento,
+        status: status,
+        empresa: selectedEmpresa,
+        pagamentos: [],
+        arquivo: formData.arquivo || undefined
+      };
+
+      console.log("✅ Nova conta criada:", novaConta);
+      
+      // Atualizar lista de contas
+      setContas(contasAtuais => {
+        const novaLista = [...contasAtuais, novaConta];
+        console.log("✅ Lista atualizada. Total de contas:", novaLista.length);
+        return novaLista;
+      });
+
+      // Limpar formulário
+      setFormData({
+        descricao: "",
+        valorTotal: "",
+        vencimento: "",
+        arquivo: ""
+      });
+      console.log("✅ Formulário limpo");
+
+      // Fechar dialog
+      setIsDialogOpen(false);
+      console.log("✅ Dialog fechado");
+
+      // Mostrar sucesso
       toast({
-        title: "Erro de validação",
-        description: "A descrição é obrigatória",
+        title: "✅ Sucesso!",
+        description: `Conta "${novaConta.descricao}" cadastrada com sucesso`,
+      });
+
+      console.log("=== CONTA SALVA COM SUCESSO ===");
+
+    } catch (error) {
+      console.error("❌ ERRO INESPERADO:", error);
+      toast({
+        title: "Erro inesperado",
+        description: "Ocorreu um erro ao salvar a conta. Tente novamente.",
         variant: "destructive",
       });
-      return;
     }
-
-    if (!formData.valorTotal?.trim()) {
-      console.log("Erro: Valor total vazio");
-      toast({
-        title: "Erro de validação",
-        description: "O valor total é obrigatório",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.vencimento?.trim()) {
-      console.log("Erro: Data de vencimento vazia");
-      toast({
-        title: "Erro de validação",
-        description: "A data de vencimento é obrigatória",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Conversão e validação do valor
-    const valorTotal = parseFloat(formData.valorTotal.replace(',', '.'));
-    console.log("Valor convertido:", valorTotal);
-    
-    if (isNaN(valorTotal) || valorTotal <= 0) {
-      console.log("Erro: Valor inválido");
-      toast({
-        title: "Erro de validação",
-        description: "O valor deve ser um número maior que zero",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Determinar status baseado na data de vencimento
-    const dataVencimento = new Date(formData.vencimento);
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    dataVencimento.setHours(0, 0, 0, 0);
-
-    const novaConta: Conta = {
-      id: Date.now(),
-      descricao: formData.descricao.trim(),
-      valorTotal: valorTotal,
-      valorPago: 0,
-      vencimento: formData.vencimento,
-      status: dataVencimento < hoje ? "vencida" : "pendente",
-      empresa: selectedEmpresa,
-      pagamentos: [],
-      arquivo: formData.arquivo || undefined // Campo opcional - só salva se tiver valor
-    };
-
-    console.log("Nova conta a ser criada:", novaConta);
-    
-    // Adicionar nova conta ao estado
-    setContas(contasAtuais => {
-      const novasContas = [...contasAtuais, novaConta];
-      console.log("Lista de contas atualizada:", novasContas);
-      return novasContas;
-    });
-
-    // Limpar formulário
-    setFormData({
-      descricao: "",
-      valorTotal: "",
-      vencimento: "",
-      arquivo: ""
-    });
-
-    // Fechar dialog
-    setIsDialogOpen(false);
-
-    // Mostrar confirmação
-    toast({
-      title: "Sucesso!",
-      description: "Conta cadastrada com sucesso",
-    });
-
-    console.log("Conta cadastrada com sucesso!");
   };
 
   const handlePagamento = () => {
@@ -358,7 +375,11 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                 <Button 
                   type="button"
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  onClick={handleSave}
+                  onClick={(e) => {
+                    console.log("🔘 BOTÃO SALVAR CLICADO");
+                    e.preventDefault();
+                    handleSave();
+                  }}
                   disabled={!isFormValid}
                 >
                   Salvar
