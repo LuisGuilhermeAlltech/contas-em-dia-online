@@ -8,7 +8,8 @@ import {
   Calendar, 
   AlertTriangle,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Plus
 } from "lucide-react";
 
 interface DashboardProps {
@@ -16,28 +17,38 @@ interface DashboardProps {
 }
 
 export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
-  // Dados fictícios para demonstração
+  // Dados zerados - o sistema começa limpo
   const dashboardData = {
-    totalAPagar: 15420.50,
-    proximaSemana: 3250.00,
-    mesAtual: 8750.30,
-    contasVencidas: 2,
-    contasPagas: 18,
-    contasPendentes: 7
+    totalAPagar: 0,
+    proximaSemana: 0,
+    mesAtual: 0,
+    contasVencidas: 0,
+    contasPagas: 0,
+    contasPendentes: 0
   };
 
-  const contasProximas = [
-    { id: 1, fornecedor: "Fornecedor A", valor: 1200.00, vencimento: "2024-07-15", status: "pendente" },
-    { id: 2, fornecedor: "Fornecedor B", valor: 850.50, vencimento: "2024-07-16", status: "pendente" },
-    { id: 3, fornecedor: "Fornecedor C", valor: 1199.50, vencimento: "2024-07-18", status: "vencida" },
-  ];
+  const contasProximas: any[] = []; // Array vazio - sem dados de exemplo
+
+  const getNomeEmpresa = (id: string) => {
+    const empresas: { [key: string]: string } = {
+      "grupo-lider": "Grupo Lider",
+      "alltech-matriz": "Alltech Matriz", 
+      "alltech-filial": "Alltech Filial",
+      "luis-guilherme": "Luis Guilherme"
+    };
+    return empresas[id] || id;
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-gray-900">Dashboard Financeiro</h2>
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900">Dashboard Financeiro</h2>
+          <p className="text-gray-600 mt-1">Empresa: {getNomeEmpresa(selectedEmpresa)}</p>
+        </div>
         <Button className="bg-blue-600 hover:bg-blue-700">
-          Novo Lançamento
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Conta
         </Button>
       </div>
 
@@ -145,24 +156,34 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {contasProximas.map((conta) => (
-              <div key={conta.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">{conta.fornecedor}</p>
-                  <p className="text-sm text-gray-600">Vencimento: {conta.vencimento}</p>
+          {contasProximas.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">Nenhuma conta próxima do vencimento</p>
+              <p className="text-sm text-gray-500 mt-2">
+                As contas com vencimento nos próximos 7 dias aparecerão aqui
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {contasProximas.map((conta) => (
+                <div key={conta.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-900">{conta.fornecedor}</p>
+                    <p className="text-sm text-gray-600">Vencimento: {conta.vencimento}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-lg text-gray-900">
+                      R$ {conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <Badge variant={conta.status === 'vencida' ? 'destructive' : 'secondary'}>
+                      {conta.status === 'vencida' ? 'Vencida' : 'Pendente'}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-lg text-gray-900">
-                    R$ {conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                  <Badge variant={conta.status === 'vencida' ? 'destructive' : 'secondary'}>
-                    {conta.status === 'vencida' ? 'Vencida' : 'Pendente'}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -16,9 +16,10 @@ import {
   Eye, 
   Edit, 
   Trash2,
-  Upload,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  DollarSign,
+  History
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -26,44 +27,108 @@ interface ContasAPagarProps {
   selectedEmpresa: string;
 }
 
+interface Pagamento {
+  id: number;
+  valor: number;
+  data: string;
+  observacao?: string;
+}
+
+interface Conta {
+  id: number;
+  nome: string;
+  fornecedor: string;
+  valorTotal: number;
+  valorPago: number;
+  vencimento: string;
+  status: "pendente" | "pago" | "vencida";
+  categoria: string;
+  observacao?: string;
+  empresa: string;
+  pagamentos: Pagamento[];
+}
+
 export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPagamentoDialogOpen, setIsPagamentoDialogOpen] = useState(false);
+  const [contaParaPagamento, setContaParaPagamento] = useState<Conta | null>(null);
+  const [contas, setContas] = useState<Conta[]>([]);
+  
+  const [formData, setFormData] = useState({
+    nome: "",
+    fornecedor: "",
+    valorTotal: "",
+    vencimento: "",
+    categoria: "",
+    observacao: ""
+  });
 
-  // Dados fictícios para demonstração
-  const contas = [
-    {
-      id: 1,
-      nome: "Energia Elétrica",
-      fornecedor: "Companhia de Energia",
-      valor: 450.75,
-      vencimento: "2024-07-15",
-      status: "pendente",
-      categoria: "Utilidades",
-      comprovante: null
-    },
-    {
-      id: 2,
-      nome: "Material de Escritório",
-      fornecedor: "Papelaria Central",
-      valor: 280.30,
-      vencimento: "2024-07-18",
-      status: "pago",
-      categoria: "Material",
-      comprovante: "comprovante1.pdf"
-    },
-    {
-      id: 3,
-      nome: "Aluguel",
-      fornecedor: "Imobiliária Silva",
-      valor: 2500.00,
-      vencimento: "2024-07-10",
-      status: "vencida",
-      categoria: "Aluguel",
-      comprovante: null
-    },
-  ];
+  const [pagamentoData, setPagamentoData] = useState({
+    valor: "",
+    observacao: ""
+  });
+
+  const handleSave = () => {
+    if (!formData.nome.trim() || !formData.valorTotal || !formData.vencimento) return;
+
+    const novaConta: Conta = {
+      id: Date.now(),
+      nome: formData.nome,
+      fornecedor: formData.fornecedor,
+      valorTotal: parseFloat(formData.valorTotal),
+      valorPago: 0,
+      vencimento: formData.vencimento,
+      status: new Date(formData.vencimento) < new Date() ? "vencida" : "pendente",
+      categoria: formData.categoria,
+      observacao: formData.observacao,
+      empresa: selectedEmpresa,
+      pagamentos: []
+    };
+
+    setContas([...contas, novaConta]);
+    setFormData({
+      nome: "",
+      fornecedor: "",
+      valorTotal: "",
+      vencimento: "",
+      categoria: "",
+      observacao: ""
+    });
+    setIsDialogOpen(false);
+  };
+
+  const handlePagamento = () => {
+    if (!contaParaPagamento || !pagamentoData.valor) return;
+
+    const valorPagamento = parseFloat(pagamentoData.valor);
+    const novoPagamento: Pagamento = {
+      id: Date.now(),
+      valor: valorPagamento,
+      data: new Date().toISOString().split('T')[0],
+      observacao: pagamentoData.observacao
+    };
+
+    const novoValorPago = contaParaPagamento.valorPago + valorPagamento;
+    const novoStatus = novoValorPago >= contaParaPagamento.valorTotal ? "pago" : contaParaPagamento.status;
+
+    const contasAtualizadas = contas.map(conta => 
+      conta.id === contaParaPagamento.id 
+        ? {
+            ...conta,
+            valorPago: novoValorPago,
+            status: novoStatus,
+            pagamentos: [...conta.pagamentos, novoPagamento]
+          }
+        : conta
+    );
+
+    setContas(contasAtualizadas);
+    setPagamentoData({ valor: "", observacao: "" });
+    setIsPagamentoDialogOpen(false);
+    setContaParaPagamento(null);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -87,6 +152,15 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     }
   };
 
+  const filteredContas = contas.filter(conta => {
+    const matchEmpresa = conta.empresa === selectedEmpresa;
+    const matchSearch = conta.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       conta.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = statusFilter === "all" || conta.status === statusFilter;
+    
+    return matchEmpresa && matchSearch && matchStatus;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -104,57 +178,67 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="nome">Nome da Conta</Label>
-                <Input id="nome" placeholder="Ex: Energia Elétrica" />
+                <Label htmlFor="nome">Nome da Conta *</Label>
+                <Input 
+                  id="nome" 
+                  placeholder="Ex: Energia Elétrica" 
+                  value={formData.nome}
+                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                />
               </div>
               <div>
                 <Label htmlFor="fornecedor">Fornecedor</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o fornecedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fornecedor1">Companhia de Energia</SelectItem>
-                    <SelectItem value="fornecedor2">Papelaria Central</SelectItem>
-                    <SelectItem value="fornecedor3">Imobiliária Silva</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input 
+                  id="fornecedor" 
+                  placeholder="Nome do fornecedor" 
+                  value={formData.fornecedor}
+                  onChange={(e) => setFormData({...formData, fornecedor: e.target.value})}
+                />
               </div>
               <div>
-                <Label htmlFor="valor">Valor</Label>
-                <Input id="valor" type="number" placeholder="0,00" />
+                <Label htmlFor="valor">Valor Total *</Label>
+                <Input 
+                  id="valor" 
+                  type="number" 
+                  step="0.01"
+                  placeholder="0,00" 
+                  value={formData.valorTotal}
+                  onChange={(e) => setFormData({...formData, valorTotal: e.target.value})}
+                />
               </div>
               <div>
-                <Label htmlFor="vencimento">Data de Vencimento</Label>
-                <Input id="vencimento" type="date" />
+                <Label htmlFor="vencimento">Data de Vencimento *</Label>
+                <Input 
+                  id="vencimento" 
+                  type="date" 
+                  value={formData.vencimento}
+                  onChange={(e) => setFormData({...formData, vencimento: e.target.value})}
+                />
               </div>
               <div>
                 <Label htmlFor="categoria">Categoria</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="utilidades">Utilidades</SelectItem>
-                    <SelectItem value="material">Material</SelectItem>
-                    <SelectItem value="aluguel">Aluguel</SelectItem>
-                    <SelectItem value="servicos">Serviços</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input 
+                  id="categoria" 
+                  placeholder="Ex: Utilidades, Material, Serviços" 
+                  value={formData.categoria}
+                  onChange={(e) => setFormData({...formData, categoria: e.target.value})}
+                />
               </div>
               <div>
                 <Label htmlFor="observacoes">Observações</Label>
-                <Textarea id="observacoes" placeholder="Observações adicionais..." />
-              </div>
-              <div className="space-y-2">
-                <Label>Comprovante</Label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Clique para fazer upload do comprovante</p>
-                </div>
+                <Textarea 
+                  id="observacoes" 
+                  placeholder="Observações adicionais..." 
+                  value={formData.observacao}
+                  onChange={(e) => setFormData({...formData, observacao: e.target.value})}
+                />
               </div>
               <div className="flex gap-2 pt-4">
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleSave}
+                  disabled={!formData.nome.trim() || !formData.valorTotal || !formData.vencimento}
+                >
                   Salvar
                 </Button>
                 <Button variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
@@ -165,6 +249,60 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Dialog de Pagamento */}
+      <Dialog open={isPagamentoDialogOpen} onOpenChange={setIsPagamentoDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Pagamento</DialogTitle>
+          </DialogHeader>
+          {contaParaPagamento && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="font-medium">{contaParaPagamento.nome}</p>
+                <p className="text-sm text-gray-600">Valor Total: R$ {contaParaPagamento.valorTotal.toFixed(2)}</p>
+                <p className="text-sm text-gray-600">Já Pago: R$ {contaParaPagamento.valorPago.toFixed(2)}</p>
+                <p className="text-sm font-medium text-red-600">
+                  Saldo: R$ {(contaParaPagamento.valorTotal - contaParaPagamento.valorPago).toFixed(2)}
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="valorPagamento">Valor do Pagamento *</Label>
+                <Input 
+                  id="valorPagamento" 
+                  type="number" 
+                  step="0.01"
+                  placeholder="0,00"
+                  max={contaParaPagamento.valorTotal - contaParaPagamento.valorPago}
+                  value={pagamentoData.valor}
+                  onChange={(e) => setPagamentoData({...pagamentoData, valor: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label htmlFor="observacaoPagamento">Observação</Label>
+                <Textarea 
+                  id="observacaoPagamento" 
+                  placeholder="Observações sobre o pagamento..." 
+                  value={pagamentoData.observacao}
+                  onChange={(e) => setPagamentoData({...pagamentoData, observacao: e.target.value})}
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={handlePagamento}
+                  disabled={!pagamentoData.valor}
+                >
+                  Registrar Pagamento
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setIsPagamentoDialogOpen(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Filtros */}
       <Card>
@@ -201,57 +339,86 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
           <CardTitle>Lista de Contas</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {contas.map((conta) => (
-              <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-4">
-                  {getStatusIcon(conta.status)}
-                  <div>
-                    <h3 className="font-medium text-gray-900">{conta.nome}</h3>
-                    <p className="text-sm text-gray-600">{conta.fornecedor}</p>
-                    <p className="text-xs text-gray-500">Categoria: {conta.categoria}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="font-bold text-lg text-gray-900">
-                      R$ {conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-sm text-gray-600">Venc: {conta.vencimento}</p>
+          {filteredContas.length === 0 ? (
+            <div className="text-center py-8">
+              <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">
+                {searchTerm || statusFilter !== "all" 
+                  ? "Nenhuma conta encontrada" 
+                  : "Nenhuma conta cadastrada"}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredContas.map((conta) => (
+                <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    {getStatusIcon(conta.status)}
+                    <div>
+                      <h3 className="font-medium text-gray-900">{conta.nome}</h3>
+                      <p className="text-sm text-gray-600">{conta.fornecedor}</p>
+                      {conta.categoria && <p className="text-xs text-gray-500">Categoria: {conta.categoria}</p>}
+                      {conta.valorPago > 0 && conta.status !== "pago" && (
+                        <p className="text-xs text-blue-600">
+                          Pago: R$ {conta.valorPago.toFixed(2)} | Saldo: R$ {(conta.valorTotal - conta.valorPago).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   
-                  {getStatusBadge(conta.status)}
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem>
-                        <Eye className="h-4 w-4 mr-2" />
-                        Visualizar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Marcar como Pago
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="font-bold text-lg text-gray-900">
+                        R$ {conta.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-sm text-gray-600">Venc: {conta.vencimento}</p>
+                    </div>
+                    
+                    {getStatusBadge(conta.status)}
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Visualizar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
+                        {conta.status !== "pago" && (
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setContaParaPagamento(conta);
+                              setIsPagamentoDialogOpen(true);
+                            }}
+                          >
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            Registrar Pagamento
+                          </DropdownMenuItem>
+                        )}
+                        {conta.pagamentos.length > 0 && (
+                          <DropdownMenuItem>
+                            <History className="h-4 w-4 mr-2" />
+                            Histórico de Pagamentos
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem className="text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

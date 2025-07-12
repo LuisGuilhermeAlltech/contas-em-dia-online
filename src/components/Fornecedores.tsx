@@ -13,10 +13,7 @@ import {
   Eye, 
   Edit, 
   Trash2,
-  Building2,
-  Phone,
-  Mail,
-  MapPin
+  Building2
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -24,46 +21,45 @@ interface FornecedoresProps {
   selectedEmpresa: string;
 }
 
+interface Fornecedor {
+  id: number;
+  nome: string;
+  observacao?: string;
+  empresa: string;
+}
+
 export const Fornecedores = ({ selectedEmpresa }: FornecedoresProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [formData, setFormData] = useState({
+    nome: "",
+    observacao: ""
+  });
 
-  // Dados fictícios para demonstração
-  const fornecedores = [
-    {
-      id: 1,
-      nome: "Companhia de Energia",
-      cnpj: "12.345.678/0001-90",
-      telefone: "(11) 3333-4444",
-      email: "contato@energia.com.br",
-      endereco: "Rua das Indústrias, 123 - São Paulo/SP",
-      categoria: "Utilidades",
-      contasAbertas: 2,
-      valorTotal: 850.75
-    },
-    {
-      id: 2,
-      nome: "Papelaria Central",
-      cnpj: "98.765.432/0001-10",
-      telefone: "(11) 2222-3333",
-      email: "vendas@papelaria.com.br",
-      endereco: "Av. Comercial, 456 - São Paulo/SP",
-      categoria: "Material",
-      contasAbertas: 1,
-      valorTotal: 280.30
-    },
-    {
-      id: 3,
-      nome: "Imobiliária Silva",
-      cnpj: "11.222.333/0001-44",
-      telefone: "(11) 4444-5555",
-      email: "contato@imosilva.com.br",
-      endereco: "Rua dos Imóveis, 789 - São Paulo/SP",
-      categoria: "Aluguel",
-      contasAbertas: 1,
-      valorTotal: 2500.00
-    }
-  ];
+  const handleSave = () => {
+    if (!formData.nome.trim()) return;
+
+    const novoFornecedor: Fornecedor = {
+      id: Date.now(),
+      nome: formData.nome,
+      observacao: formData.observacao,
+      empresa: selectedEmpresa
+    };
+
+    setFornecedores([...fornecedores, novoFornecedor]);
+    setFormData({ nome: "", observacao: "" });
+    setIsDialogOpen(false);
+  };
+
+  const handleDelete = (id: number) => {
+    setFornecedores(fornecedores.filter(f => f.id !== id));
+  };
+
+  const filteredFornecedores = fornecedores.filter(fornecedor => 
+    fornecedor.empresa === selectedEmpresa &&
+    fornecedor.nome.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -82,35 +78,29 @@ export const Fornecedores = ({ selectedEmpresa }: FornecedoresProps) => {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="nome">Nome/Razão Social</Label>
-                <Input id="nome" placeholder="Nome do fornecedor" />
+                <Label htmlFor="nome">Nome *</Label>
+                <Input 
+                  id="nome" 
+                  placeholder="Nome do fornecedor" 
+                  value={formData.nome}
+                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                />
               </div>
               <div>
-                <Label htmlFor="cnpj">CNPJ/CPF</Label>
-                <Input id="cnpj" placeholder="00.000.000/0000-00" />
-              </div>
-              <div>
-                <Label htmlFor="telefone">Telefone</Label>
-                <Input id="telefone" placeholder="(00) 0000-0000" />
-              </div>
-              <div>
-                <Label htmlFor="email">E-mail</Label>
-                <Input id="email" type="email" placeholder="contato@empresa.com" />
-              </div>
-              <div>
-                <Label htmlFor="endereco">Endereço</Label>
-                <Textarea id="endereco" placeholder="Endereço completo..." />
-              </div>
-              <div>
-                <Label htmlFor="categoria">Categoria</Label>
-                <Input id="categoria" placeholder="Ex: Utilidades, Material, Serviços" />
-              </div>
-              <div>
-                <Label htmlFor="observacoes">Observações</Label>
-                <Textarea id="observacoes" placeholder="Informações adicionais..." />
+                <Label htmlFor="observacao">Observação</Label>
+                <Textarea 
+                  id="observacao" 
+                  placeholder="Observações adicionais (opcional)..." 
+                  value={formData.observacao}
+                  onChange={(e) => setFormData({...formData, observacao: e.target.value})}
+                />
               </div>
               <div className="flex gap-2 pt-4">
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleSave}
+                  disabled={!formData.nome.trim()}
+                >
                   Salvar
                 </Button>
                 <Button variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
@@ -138,111 +128,81 @@ export const Fornecedores = ({ selectedEmpresa }: FornecedoresProps) => {
       </Card>
 
       {/* Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Total de Fornecedores</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600">{fornecedores.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Contas em Aberto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-orange-600">
-              {fornecedores.reduce((acc, f) => acc + f.contasAbertas, 0)}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Valor Total em Aberto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-600">
-              R$ {fornecedores.reduce((acc, f) => acc + f.valorTotal, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Resumo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-blue-600">
+            {filteredFornecedores.length} fornecedor(es) cadastrado(s)
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Lista de Fornecedores */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {fornecedores.map((fornecedor) => (
-          <Card key={fornecedor.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">{fornecedor.nome}</CardTitle>
-                    <p className="text-sm text-gray-600">{fornecedor.cnpj}</p>
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem>
-                      <Eye className="h-4 w-4 mr-2" />
-                      Visualizar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Phone className="h-4 w-4" />
-                  {fornecedor.telefone}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Mail className="h-4 w-4" />
-                  {fornecedor.email}
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  {fornecedor.endereco}
-                </div>
-                
-                <div className="pt-3 border-t border-gray-200">
-                  <div className="flex justify-between items-center">
+      {filteredFornecedores.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">
+              {searchTerm ? "Nenhum fornecedor encontrado" : "Nenhum fornecedor cadastrado"}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredFornecedores.map((fornecedor) => (
+            <Card key={fornecedor.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Building2 className="h-6 w-6 text-blue-600" />
+                    </div>
                     <div>
-                      <p className="text-sm text-gray-600">Contas em Aberto</p>
-                      <p className="font-bold text-orange-600">{fornecedor.contasAbertas}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">Valor Total</p>
-                      <p className="font-bold text-red-600">
-                        R$ {fornecedor.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
+                      <CardTitle className="text-lg">{fornecedor.nome}</CardTitle>
                     </div>
                   </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Visualizar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className="text-red-600"
+                        onClick={() => handleDelete(fornecedor.id)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardHeader>
+              {fornecedor.observacao && (
+                <CardContent>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-gray-600 font-medium">Observação:</p>
+                      <p className="text-sm text-gray-800">{fornecedor.observacao}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
