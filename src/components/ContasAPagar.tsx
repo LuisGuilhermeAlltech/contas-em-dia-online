@@ -23,6 +23,7 @@ import {
   Paperclip
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 
 interface ContasAPagarProps {
   selectedEmpresa: string;
@@ -48,6 +49,7 @@ interface Conta {
 }
 
 export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -68,54 +70,122 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   });
 
   const handleSave = () => {
-    if (!formData.descricao.trim() || !formData.valorTotal || !formData.vencimento) {
-      alert("Preencha todos os campos obrigatórios");
+    console.log("Função handleSave chamada");
+    console.log("Dados do formulário:", formData);
+    
+    // Validação melhorada
+    if (!formData.descricao || formData.descricao.trim() === "") {
+      toast({
+        title: "Erro de validação",
+        description: "A descrição é obrigatória",
+        variant: "destructive",
+      });
       return;
     }
 
-    const valorTotal = parseFloat(formData.valorTotal);
-    if (isNaN(valorTotal) || valorTotal <= 0) {
-      alert("Valor deve ser maior que zero");
+    if (!formData.valorTotal || formData.valorTotal.trim() === "") {
+      toast({
+        title: "Erro de validação",
+        description: "O valor total é obrigatório",
+        variant: "destructive",
+      });
       return;
     }
+
+    if (!formData.vencimento || formData.vencimento.trim() === "") {
+      toast({
+        title: "Erro de validação",
+        description: "A data de vencimento é obrigatória",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const valorTotal = parseFloat(formData.valorTotal.replace(',', '.'));
+    console.log("Valor convertido:", valorTotal);
+    
+    if (isNaN(valorTotal) || valorTotal <= 0) {
+      toast({
+        title: "Erro de validação",
+        description: "O valor deve ser um número maior que zero",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Criar nova conta
+    const dataVencimento = new Date(formData.vencimento);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    dataVencimento.setHours(0, 0, 0, 0);
 
     const novaConta: Conta = {
       id: Date.now(),
-      descricao: formData.descricao,
+      descricao: formData.descricao.trim(),
       valorTotal: valorTotal,
       valorPago: 0,
       vencimento: formData.vencimento,
-      status: new Date(formData.vencimento) < new Date() ? "vencida" : "pendente",
+      status: dataVencimento < hoje ? "vencida" : "pendente",
       empresa: selectedEmpresa,
       pagamentos: [],
       arquivo: formData.arquivo
     };
 
-    setContas([...contas, novaConta]);
+    console.log("Nova conta criada:", novaConta);
+    
+    setContas(contasAtuais => {
+      const novasContas = [...contasAtuais, novaConta];
+      console.log("Contas atualizadas:", novasContas);
+      return novasContas;
+    });
+
+    // Limpar formulário
     setFormData({
       descricao: "",
       valorTotal: "",
       vencimento: "",
       arquivo: ""
     });
+
+    // Fechar dialog
     setIsDialogOpen(false);
+
+    // Mostrar confirmação
+    toast({
+      title: "Sucesso!",
+      description: "Conta cadastrada com sucesso",
+    });
+
+    console.log("Processo de salvamento concluído");
   };
 
   const handlePagamento = () => {
     if (!contaParaPagamento || !pagamentoData.valor) {
-      alert("Informe o valor do pagamento");
+      toast({
+        title: "Erro",
+        description: "Informe o valor do pagamento",
+        variant: "destructive",
+      });
       return;
     }
 
-    const valorPagamento = parseFloat(pagamentoData.valor);
+    const valorPagamento = parseFloat(pagamentoData.valor.replace(',', '.'));
     if (isNaN(valorPagamento) || valorPagamento <= 0) {
-      alert("Valor do pagamento deve ser maior que zero");
+      toast({
+        title: "Erro",
+        description: "Valor do pagamento deve ser maior que zero",
+        variant: "destructive",
+      });
       return;
     }
 
     const saldoRestante = contaParaPagamento.valorTotal - contaParaPagamento.valorPago;
     if (valorPagamento > saldoRestante) {
-      alert(`Valor não pode ser maior que o saldo restante: R$ ${saldoRestante.toFixed(2)}`);
+      toast({
+        title: "Erro",
+        description: `Valor não pode ser maior que o saldo restante: R$ ${saldoRestante.toFixed(2)}`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -144,11 +214,20 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     setPagamentoData({ valor: "", observacao: "" });
     setIsPagamentoDialogOpen(false);
     setContaParaPagamento(null);
+
+    toast({
+      title: "Sucesso!",
+      description: "Pagamento registrado com sucesso",
+    });
   };
 
   const handleDelete = (contaId: number) => {
     if (confirm("Tem certeza que deseja excluir esta conta?")) {
       setContas(contas.filter(conta => conta.id !== contaId));
+      toast({
+        title: "Sucesso!",
+        description: "Conta excluída com sucesso",
+      });
     }
   };
 
@@ -182,6 +261,13 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     return matchEmpresa && matchSearch && matchStatus;
   });
 
+  // Validação do formulário para o botão
+  const isFormValid = formData.descricao.trim() !== "" && 
+                     formData.valorTotal.trim() !== "" && 
+                     formData.vencimento.trim() !== "";
+
+  console.log("Estado do formulário:", { formData, isFormValid });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -204,7 +290,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   id="descricao" 
                   placeholder="Ex: Nota 234 - José Material de Construção" 
                   value={formData.descricao}
-                  onChange={(e) => setFormData({...formData, descricao: e.target.value})}
+                  onChange={(e) => {
+                    console.log("Descrição alterada:", e.target.value);
+                    setFormData({...formData, descricao: e.target.value});
+                  }}
                   className="min-h-20"
                 />
               </div>
@@ -216,7 +305,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   step="0.01"
                   placeholder="0,00" 
                   value={formData.valorTotal}
-                  onChange={(e) => setFormData({...formData, valorTotal: e.target.value})}
+                  onChange={(e) => {
+                    console.log("Valor alterado:", e.target.value);
+                    setFormData({...formData, valorTotal: e.target.value});
+                  }}
                 />
               </div>
               <div>
@@ -225,7 +317,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   id="vencimento" 
                   type="date" 
                   value={formData.vencimento}
-                  onChange={(e) => setFormData({...formData, vencimento: e.target.value})}
+                  onChange={(e) => {
+                    console.log("Vencimento alterado:", e.target.value);
+                    setFormData({...formData, vencimento: e.target.value});
+                  }}
                 />
               </div>
               <div>
@@ -237,6 +332,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                     accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
+                      console.log("Arquivo selecionado:", file?.name);
                       setFormData({...formData, arquivo: file?.name || ""});
                     }}
                     className="flex-1"
@@ -246,16 +342,22 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
               </div>
               <div className="flex gap-2 pt-4">
                 <Button 
+                  type="button"
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  onClick={handleSave}
-                  disabled={!formData.descricao.trim() || !formData.valorTotal || !formData.vencimento}
+                  onClick={() => {
+                    console.log("Botão Salvar clicado");
+                    handleSave();
+                  }}
+                  disabled={!isFormValid}
                 >
                   Salvar
                 </Button>
                 <Button 
+                  type="button"
                   variant="outline" 
                   className="flex-1" 
                   onClick={() => {
+                    console.log("Botão Cancelar clicado");
                     setIsDialogOpen(false);
                     setFormData({
                       descricao: "",
