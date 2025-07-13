@@ -16,17 +16,20 @@ interface DashboardProps {
   selectedEmpresa: string;
 }
 
-interface Conta {
+interface ContaView {
   id: string;
   descricao: string;
-  valor_total: number;
-  total_pago: number;
-  vencimento: string;
   empresa: string;
+  valor_total: number;
+  vencimento: string;
+  total_pago: number;
+  saldo: number;
+  status: 'Pago' | 'Parcial' | 'Pendente';
+  created_at: string;
 }
 
 interface DashboardData {
-  totalAPagar: number;
+  totalHoje: number;
   proximaSemana: number;
   mesAtual: number;
   contasVencidas: number;
@@ -36,14 +39,14 @@ interface DashboardData {
 
 export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
   const [dashboardData, setDashboardData] = useState<DashboardData>({
-    totalAPagar: 0,
+    totalHoje: 0,
     proximaSemana: 0,
     mesAtual: 0,
     contasVencidas: 0,
     contasPagas: 0,
     contasPendentes: 0
   });
-  const [contasProximas, setContasProximas] = useState<Conta[]>([]);
+  const [contasProximas, setContasProximas] = useState<ContaView[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadDashboardData = async () => {
@@ -52,7 +55,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       console.log("Carregando dados do dashboard para empresa:", selectedEmpresa);
 
       const { data: contas, error } = await supabase
-        .from('contas')
+        .from('contas_view')
         .select('*')
         .eq('empresa', selectedEmpresa);
 
@@ -79,37 +82,35 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
 
-      let totalAPagar = 0;
+      let totalHoje = 0;
       let valorProximaSemana = 0;
       let valorMesAtual = 0;
       let contasVencidas = 0;
       let contasPagas = 0;
       let contasPendentes = 0;
-      const contasVencemProximo: Conta[] = [];
+      const contasVencemProximo: ContaView[] = [];
 
       contas.forEach(conta => {
         const vencimento = new Date(conta.vencimento);
         vencimento.setHours(0, 0, 0, 0);
         
-        const saldoRestante = conta.valor_total - conta.total_pago;
-        const isPago = conta.total_pago >= conta.valor_total;
-        const isVencida = vencimento < hoje && !isPago;
-        const isPendente = vencimento >= hoje && !isPago;
+        const isPago = conta.status === 'Pago';
+        const isVencida = conta.status !== 'Pago' && vencimento < hoje;
 
-        // Total a pagar (apenas contas não quitadas)
-        if (!isPago) {
-          totalAPagar += saldoRestante;
+        // Total Hoje → SUM(saldo) vencimento = hoje
+        if (vencimento.getTime() === hoje.getTime() && !isPago) {
+          totalHoje += conta.saldo;
         }
 
-        // Contas da próxima semana
+        // Próx. Semana → vencimento ≤ hoje+7
         if (vencimento <= proximaSemana && vencimento >= hoje && !isPago) {
-          valorProximaSemana += saldoRestante;
+          valorProximaSemana += conta.saldo;
           contasVencemProximo.push(conta);
         }
 
-        // Contas do mês atual
+        // Mês Atual → vencimento dentro do mês
         if (vencimento >= inicioMes && vencimento <= fimMes && !isPago) {
-          valorMesAtual += saldoRestante;
+          valorMesAtual += conta.saldo;
         }
 
         // Contadores por status
@@ -117,13 +118,13 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
           contasPagas++;
         } else if (isVencida) {
           contasVencidas++;
-        } else if (isPendente) {
+        } else {
           contasPendentes++;
         }
       });
 
       const newDashboardData: DashboardData = {
-        totalAPagar,
+        totalHoje,
         proximaSemana: valorProximaSemana,
         mesAtual: valorMesAtual,
         contasVencidas,
@@ -158,15 +159,6 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
     return empresas[id] || id;
   };
 
-  const getStatus = (conta: Conta) => {
-    if (conta.total_pago >= conta.valor_total) return "pago";
-    const dataVencimento = new Date(conta.vencimento);
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    dataVencimento.setHours(0, 0, 0, 0);
-    return dataVencimento < hoje ? "vencida" : "pendente";
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -190,14 +182,14 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border-l-4 border-l-red-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total a Pagar</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Total Hoje</CardTitle>
             <DollarSign className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              R$ {dashboardData.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {dashboardData.totalHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-gray-500 mt-1">Saldo em aberto</p>
+            <p className="text-xs text-gray-500 mt-1">Vencimento hoje</p>
           </CardContent>
         </Card>
 
@@ -308,28 +300,24 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             </div>
           ) : (
             <div className="space-y-4">
-              {contasProximas.map((conta) => {
-                const status = getStatus(conta);
-                const saldoRestante = conta.valor_total - conta.total_pago;
-                return (
-                  <div key={conta.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900">{conta.descricao}</p>
-                      <p className="text-sm text-gray-600">
-                        Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg text-gray-900">
-                        R$ {saldoRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <Badge variant={status === 'vencida' ? 'destructive' : 'secondary'}>
-                        {status === 'vencida' ? 'Vencida' : 'Pendente'}
-                      </Badge>
-                    </div>
+              {contasProximas.map((conta) => (
+                <div key={conta.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-900">{conta.descricao}</p>
+                    <p className="text-sm text-gray-600">
+                      Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}
+                    </p>
                   </div>
-                );
-              })}
+                  <div className="text-right">
+                    <p className="font-bold text-lg text-gray-900">
+                      R$ {conta.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <Badge variant={conta.status === 'Pago' ? 'default' : (conta.status === 'Parcial' ? 'secondary' : 'secondary')}>
+                      {conta.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
@@ -340,21 +328,21 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
         <CardHeader>
           <CardTitle className="text-blue-700 flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Dicas para Organização
+            Resumo do Sistema
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h4 className="font-semibold text-blue-800 mb-2">Cadastro Rápido</h4>
+              <h4 className="font-semibold text-blue-800 mb-2">Dados em Tempo Real</h4>
               <p className="text-sm text-blue-700">
-                Use descrições claras como "Nota 234 - José Material" para identificar facilmente suas contas.
+                Todos os dados são calculados automaticamente pela view contas_view do Supabase.
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-blue-800 mb-2">Pagamentos Parciais</h4>
               <p className="text-sm text-blue-700">
-                Registre pagamentos parciais conforme sua disponibilidade financeira.
+                Registre pagamentos parciais e acompanhe o saldo restante de cada conta.
               </p>
             </div>
           </div>

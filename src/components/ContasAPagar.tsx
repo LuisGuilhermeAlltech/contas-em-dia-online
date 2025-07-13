@@ -13,14 +13,8 @@ import {
   Search, 
   Filter, 
   MoreHorizontal, 
-  Eye, 
-  Edit, 
-  Trash2,
-  CheckCircle2,
-  AlertCircle,
   DollarSign,
-  History,
-  Paperclip
+  Trash2
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -30,22 +24,16 @@ interface ContasAPagarProps {
   selectedEmpresa: string;
 }
 
-interface Pagamento {
-  id: string;
-  valor: number;
-  data: string;
-  created_at: string;
-}
-
-interface Conta {
+interface ContaView {
   id: string;
   descricao: string;
-  valor_total: number;
-  total_pago: number;
-  vencimento: string;
   empresa: string;
+  valor_total: number;
+  vencimento: string;
+  total_pago: number;
+  saldo: number;
+  status: 'Pago' | 'Parcial' | 'Pendente';
   created_at: string;
-  pagamentos?: Pagamento[];
 }
 
 export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
@@ -54,8 +42,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPagamentoDialogOpen, setIsPagamentoDialogOpen] = useState(false);
-  const [contaParaPagamento, setContaParaPagamento] = useState<Conta | null>(null);
-  const [contas, setContas] = useState<Conta[]>([]);
+  const [contaParaPagamento, setContaParaPagamento] = useState<ContaView | null>(null);
+  const [contas, setContas] = useState<ContaView[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [formData, setFormData] = useState({
@@ -65,24 +53,33 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   });
 
   const [pagamentoData, setPagamentoData] = useState({
-    valor: "",
-    observacao: ""
+    valor: ""
   });
 
-  // Carregar contas do Supabase
+  const getEmpresaValue = (empresaNome: string) => {
+    const empresaMap: { [key: string]: string } = {
+      "Grupo Líder": "grupo-lider",
+      "Alltech Matriz": "alltech-matriz", 
+      "Alltech Filial": "alltech-filial",
+      "Luis Guilherme": "luis-guilherme"
+    };
+    return empresaMap[empresaNome] || selectedEmpresa;
+  };
+
+  // Carregar contas da view contas_view
   const loadContas = async () => {
     try {
       setLoading(true);
-      console.log("Carregando contas para empresa:", selectedEmpresa);
+      console.log("Carregando contas da view para empresa:", selectedEmpresa);
       
-      const { data: contasData, error: contasError } = await supabase
-        .from('contas')
+      const { data: contasData, error } = await supabase
+        .from('contas_view')
         .select('*')
         .eq('empresa', selectedEmpresa)
         .order('vencimento', { ascending: true });
 
-      if (contasError) {
-        console.error("Erro ao carregar contas:", contasError);
+      if (error) {
+        console.error("Erro ao carregar contas:", error);
         toast({
           title: "Erro",
           description: "Erro ao carregar contas do banco de dados",
@@ -91,24 +88,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         return;
       }
 
-      // Carregar pagamentos para cada conta
-      const contasComPagamentos = await Promise.all(
-        (contasData || []).map(async (conta) => {
-          const { data: pagamentos } = await supabase
-            .from('pagamentos')
-            .select('*')
-            .eq('conta_id', conta.id)
-            .order('data', { ascending: false });
-
-          return {
-            ...conta,
-            pagamentos: pagamentos || []
-          };
-        })
-      );
-
-      setContas(contasComPagamentos);
-      console.log("Contas carregadas:", contasComPagamentos);
+      setContas(contasData || []);
+      console.log("Contas carregadas da view:", contasData);
     } catch (error) {
       console.error("Erro inesperado:", error);
       toast({
@@ -154,15 +135,14 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         return;
       }
 
-      // Inserir no Supabase
+      // Inserir no Supabase na tabela contas
       const { data, error } = await supabase
         .from('contas')
         .insert({
           descricao: formData.descricao.trim(),
           empresa: selectedEmpresa,
           valor_total: valorNumerico,
-          vencimento: formData.vencimento,
-          total_pago: 0
+          vencimento: formData.vencimento
         })
         .select()
         .single();
@@ -183,7 +163,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       setFormData({ descricao: "", valorTotal: "", vencimento: "" });
       setIsDialogOpen(false);
 
-      // Recarregar lista
+      // Recarregar lista da view
       await loadContas();
 
       toast({
@@ -222,17 +202,16 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         return;
       }
 
-      const saldoRestante = contaParaPagamento.valor_total - contaParaPagamento.total_pago;
-      if (valorPagamento > saldoRestante) {
+      if (valorPagamento > contaParaPagamento.saldo) {
         toast({
           title: "Erro",
-          description: `Valor não pode ser maior que o saldo restante: R$ ${saldoRestante.toFixed(2)}`,
+          description: `Valor não pode ser maior que o saldo restante: R$ ${contaParaPagamento.saldo.toFixed(2)}`,
           variant: "destructive",
         });
         return;
       }
 
-      // Inserir pagamento
+      // Inserir pagamento na tabela pagamentos
       const { error: pagamentoError } = await supabase
         .from('pagamentos')
         .insert({
@@ -251,29 +230,12 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         return;
       }
 
-      // Atualizar total pago na conta
-      const novoTotalPago = contaParaPagamento.total_pago + valorPagamento;
-      const { error: contaError } = await supabase
-        .from('contas')
-        .update({ total_pago: novoTotalPago })
-        .eq('id', contaParaPagamento.id);
-
-      if (contaError) {
-        console.error("Erro ao atualizar conta:", contaError);
-        toast({
-          title: "Erro",
-          description: "Erro ao atualizar conta",
-          variant: "destructive",
-        });
-        return;
-      }
-
       // Limpar e fechar dialog
-      setPagamentoData({ valor: "", observacao: "" });
+      setPagamentoData({ valor: "" });
       setIsPagamentoDialogOpen(false);
       setContaParaPagamento(null);
 
-      // Recarregar lista
+      // Recarregar lista da view (os valores são calculados automaticamente)
       await loadContas();
 
       toast({
@@ -325,41 +287,20 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     }
   };
 
-  const getStatus = (conta: Conta) => {
-    if (conta.total_pago >= conta.valor_total) return "pago";
-    const dataVencimento = new Date(conta.vencimento);
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    dataVencimento.setHours(0, 0, 0, 0);
-    return dataVencimento < hoje ? "vencida" : "pendente";
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pago":
+      case "Pago":
         return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Pago</Badge>;
-      case "vencida":
-        return <Badge variant="destructive">Vencida</Badge>;
+      case "Parcial":
+        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Parcial</Badge>;
       default:
         return <Badge variant="secondary">Pendente</Badge>;
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pago":
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case "vencida":
-        return <AlertCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return <AlertCircle className="h-4 w-4 text-orange-600" />;
-    }
-  };
-
   const filteredContas = contas.filter(conta => {
-    const status = getStatus(conta);
     const matchSearch = conta.descricao.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchStatus = statusFilter === "all" || status === statusFilter;
+    const matchStatus = statusFilter === "all" || conta.status.toLowerCase() === statusFilter;
     return matchSearch && matchStatus;
   });
 
@@ -462,7 +403,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                 <p className="text-sm text-gray-600">Valor Total: R$ {contaParaPagamento.valor_total.toFixed(2)}</p>
                 <p className="text-sm text-gray-600">Já Pago: R$ {contaParaPagamento.total_pago.toFixed(2)}</p>
                 <p className="text-sm font-medium text-red-600">
-                  Saldo: R$ {(contaParaPagamento.valor_total - contaParaPagamento.total_pago).toFixed(2)}
+                  Saldo: R$ {contaParaPagamento.saldo.toFixed(2)}
                 </p>
               </div>
               <div>
@@ -472,9 +413,9 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   type="number" 
                   step="0.01"
                   placeholder="0,00"
-                  max={contaParaPagamento.valor_total - contaParaPagamento.total_pago}
+                  max={contaParaPagamento.saldo}
                   value={pagamentoData.valor}
-                  onChange={(e) => setPagamentoData({...pagamentoData, valor: e.target.value})}
+                  onChange={(e) => setPagamentoData({valor: e.target.value})}
                 />
               </div>
               <div className="flex gap-2 pt-4">
@@ -490,7 +431,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   className="flex-1" 
                   onClick={() => {
                     setIsPagamentoDialogOpen(false);
-                    setPagamentoData({ valor: "", observacao: "" });
+                    setPagamentoData({ valor: "" });
                   }}
                 >
                   Cancelar
@@ -522,8 +463,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
                 <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="parcial">Parcial</SelectItem>
                 <SelectItem value="pago">Pago</SelectItem>
-                <SelectItem value="vencida">Vencida</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -547,77 +488,62 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredContas.map((conta) => {
-                const status = getStatus(conta);
-                return (
-                  <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      {getStatusIcon(status)}
-                      <div>
-                        <h3 className="font-medium text-gray-900">{conta.descricao}</h3>
-                        <p className="text-sm text-gray-600">Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}</p>
-                        {conta.total_pago > 0 && status !== "pago" && (
-                          <p className="text-xs text-blue-600">
-                            Pago: R$ {conta.total_pago.toFixed(2)} | Saldo: R$ {(conta.valor_total - conta.total_pago).toFixed(2)}
-                          </p>
-                        )}
-                      </div>
+              {filteredContas.map((conta) => (
+                <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex-1">
+                    <h3 className="font-medium text-gray-900">{conta.descricao}</h3>
+                    <p className="text-sm text-gray-600">
+                      Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}
+                    </p>
+                    {conta.status === "Parcial" && (
+                      <p className="text-xs text-blue-600">
+                        Pago: R$ {conta.total_pago.toFixed(2)} | Saldo: R$ {conta.saldo.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="font-bold text-lg text-gray-900">
+                        R$ {conta.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Total: R$ {conta.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
                     </div>
                     
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-bold text-lg text-gray-900">
-                          R$ {conta.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      
-                      {getStatusBadge(status)}
-                      
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Visualizar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          {status !== "pago" && (
-                            <DropdownMenuItem 
-                              onClick={() => {
-                                setContaParaPagamento(conta);
-                                setIsPagamentoDialogOpen(true);
-                              }}
-                            >
-                              <DollarSign className="h-4 w-4 mr-2" />
-                              Registrar Pagamento
-                            </DropdownMenuItem>
-                          )}
-                          {conta.pagamentos && conta.pagamentos.length > 0 && (
-                            <DropdownMenuItem>
-                              <History className="h-4 w-4 mr-2" />
-                              Histórico ({conta.pagamentos.length} pagamentos)
-                            </DropdownMenuItem>
-                          )}
+                    {getStatusBadge(conta.status)}
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {conta.status !== "Pago" && (
                           <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={() => handleDelete(conta.id)}
+                            onClick={() => {
+                              setContaParaPagamento(conta);
+                              setIsPagamentoDialogOpen(true);
+                            }}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            Registrar Pagamento
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        )}
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={() => handleDelete(conta.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
