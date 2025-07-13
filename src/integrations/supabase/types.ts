@@ -14,7 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contas: {
+        Row: {
+          created_at: string | null
+          descricao: string
+          empresa: string
+          id: string
+          total_pago: number | null
+          valor_total: number
+          vencimento: string
+        }
+        Insert: {
+          created_at?: string | null
+          descricao: string
+          empresa: string
+          id?: string
+          total_pago?: number | null
+          valor_total: number
+          vencimento: string
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string
+          empresa?: string
+          id?: string
+          total_pago?: number | null
+          valor_total?: number
+          vencimento?: string
+        }
+        Relationships: []
+      }
+      fornecedores: {
+        Row: {
+          created_at: string | null
+          empresa: string
+          id: string
+          nome: string
+          observacao: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          empresa: string
+          id?: string
+          nome: string
+          observacao?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          empresa?: string
+          id?: string
+          nome?: string
+          observacao?: string | null
+        }
+        Relationships: []
+      }
+      pagamentos: {
+        Row: {
+          conta_id: string
+          created_at: string | null
+          data: string
+          id: string
+          valor: number
+        }
+        Insert: {
+          conta_id: string
+          created_at?: string | null
+          data: string
+          id?: string
+          valor: number
+        }
+        Update: {
+          conta_id?: string
+          created_at?: string | null
+          data?: string
+          id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagamentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

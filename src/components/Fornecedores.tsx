@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,50 +16,183 @@ import {
   Building2
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FornecedoresProps {
   selectedEmpresa: string;
 }
 
 interface Fornecedor {
-  id: number;
+  id: string;
   nome: string;
   observacao?: string;
   empresa: string;
+  created_at: string;
 }
 
 export const Fornecedores = ({ selectedEmpresa }: FornecedoresProps) => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     nome: "",
     observacao: ""
   });
 
-  const handleSave = () => {
-    if (!formData.nome.trim()) return;
+  // Carregar fornecedores do Supabase
+  const loadFornecedores = async () => {
+    try {
+      setLoading(true);
+      console.log("Carregando fornecedores para empresa:", selectedEmpresa);
+      
+      const { data, error } = await supabase
+        .from('fornecedores')
+        .select('*')
+        .eq('empresa', selectedEmpresa)
+        .order('nome', { ascending: true });
 
-    const novoFornecedor: Fornecedor = {
-      id: Date.now(),
-      nome: formData.nome,
-      observacao: formData.observacao,
-      empresa: selectedEmpresa
-    };
+      if (error) {
+        console.error("Erro ao carregar fornecedores:", error);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar fornecedores do banco de dados",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    setFornecedores([...fornecedores, novoFornecedor]);
-    setFormData({ nome: "", observacao: "" });
-    setIsDialogOpen(false);
+      setFornecedores(data || []);
+      console.log("Fornecedores carregados:", data);
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao carregar dados",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setFornecedores(fornecedores.filter(f => f.id !== id));
+  // Carregar fornecedores quando a empresa mudar
+  useEffect(() => {
+    if (selectedEmpresa) {
+      loadFornecedores();
+    }
+  }, [selectedEmpresa]);
+
+  const handleSave = async () => {
+    console.log("=== SALVANDO FORNECEDOR NO SUPABASE ===");
+    console.log("Dados do formulário:", formData);
+    console.log("Empresa selecionada:", selectedEmpresa);
+
+    try {
+      // Validação
+      if (!formData.nome || formData.nome.trim() === "") {
+        toast({
+          title: "Campo obrigatório",
+          description: "Por favor, preencha o nome do fornecedor",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Inserir no Supabase
+      const { data, error } = await supabase
+        .from('fornecedores')
+        .insert({
+          nome: formData.nome.trim(),
+          observacao: formData.observacao.trim() || null,
+          empresa: selectedEmpresa
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Erro do Supabase:", error);
+        toast({
+          title: "Erro ao salvar",
+          description: "Erro ao salvar fornecedor no banco de dados",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("✅ Fornecedor salvo no Supabase:", data);
+
+      // Limpar formulário e fechar dialog
+      setFormData({ nome: "", observacao: "" });
+      setIsDialogOpen(false);
+
+      // Recarregar lista
+      await loadFornecedores();
+
+      toast({
+        title: "✅ Sucesso!",
+        description: `Fornecedor "${data.nome}" cadastrado com sucesso`,
+      });
+
+    } catch (error) {
+      console.error("❌ ERRO INESPERADO:", error);
+      toast({
+        title: "Erro inesperado",
+        description: "Ocorreu um erro ao salvar o fornecedor",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (fornecedorId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este fornecedor?")) return;
+
+    try {
+      const { error } = await supabase
+        .from('fornecedores')
+        .delete()
+        .eq('id', fornecedorId);
+
+      if (error) {
+        console.error("Erro ao excluir:", error);
+        toast({
+          title: "Erro",
+          description: "Erro ao excluir fornecedor",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await loadFornecedores();
+      toast({
+        title: "Sucesso!",
+        description: "Fornecedor excluído com sucesso",
+      });
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao excluir fornecedor",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredFornecedores = fornecedores.filter(fornecedor => 
-    fornecedor.empresa === selectedEmpresa &&
     fornecedor.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center p-8">
+          <p className="text-gray-600">Carregando fornecedores...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

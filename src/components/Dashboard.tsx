@@ -1,6 +1,6 @@
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   DollarSign, 
@@ -8,27 +8,145 @@ import {
   Calendar, 
   AlertTriangle,
   Clock,
-  CheckCircle2,
-  Plus
+  CheckCircle2
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DashboardProps {
   selectedEmpresa: string;
 }
 
+interface Conta {
+  id: string;
+  descricao: string;
+  valor_total: number;
+  total_pago: number;
+  vencimento: string;
+  empresa: string;
+}
+
+interface DashboardData {
+  totalAPagar: number;
+  proximaSemana: number;
+  mesAtual: number;
+  contasVencidas: number;
+  contasPagas: number;
+  contasPendentes: number;
+}
+
 export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
-  // Para demonstração, usando dados zerados - em uma implementação real
-  // estes dados viriam de um contexto compartilhado ou estado global
-  const dashboardData = {
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalAPagar: 0,
     proximaSemana: 0,
     mesAtual: 0,
     contasVencidas: 0,
     contasPagas: 0,
     contasPendentes: 0
+  });
+  const [contasProximas, setContasProximas] = useState<Conta[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      console.log("Carregando dados do dashboard para empresa:", selectedEmpresa);
+
+      const { data: contas, error } = await supabase
+        .from('contas')
+        .select('*')
+        .eq('empresa', selectedEmpresa);
+
+      if (error) {
+        console.error("Erro ao carregar contas:", error);
+        return;
+      }
+
+      if (!contas) {
+        console.log("Nenhuma conta encontrada");
+        return;
+      }
+
+      console.log("Contas carregadas para dashboard:", contas);
+
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      // Data para próxima semana (7 dias)
+      const proximaSemana = new Date(hoje);
+      proximaSemana.setDate(proximaSemana.getDate() + 7);
+
+      // Primeiro e último dia do mês atual
+      const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+
+      let totalAPagar = 0;
+      let valorProximaSemana = 0;
+      let valorMesAtual = 0;
+      let contasVencidas = 0;
+      let contasPagas = 0;
+      let contasPendentes = 0;
+      const contasVencemProximo: Conta[] = [];
+
+      contas.forEach(conta => {
+        const vencimento = new Date(conta.vencimento);
+        vencimento.setHours(0, 0, 0, 0);
+        
+        const saldoRestante = conta.valor_total - conta.total_pago;
+        const isPago = conta.total_pago >= conta.valor_total;
+        const isVencida = vencimento < hoje && !isPago;
+        const isPendente = vencimento >= hoje && !isPago;
+
+        // Total a pagar (apenas contas não quitadas)
+        if (!isPago) {
+          totalAPagar += saldoRestante;
+        }
+
+        // Contas da próxima semana
+        if (vencimento <= proximaSemana && vencimento >= hoje && !isPago) {
+          valorProximaSemana += saldoRestante;
+          contasVencemProximo.push(conta);
+        }
+
+        // Contas do mês atual
+        if (vencimento >= inicioMes && vencimento <= fimMes && !isPago) {
+          valorMesAtual += saldoRestante;
+        }
+
+        // Contadores por status
+        if (isPago) {
+          contasPagas++;
+        } else if (isVencida) {
+          contasVencidas++;
+        } else if (isPendente) {
+          contasPendentes++;
+        }
+      });
+
+      const newDashboardData: DashboardData = {
+        totalAPagar,
+        proximaSemana: valorProximaSemana,
+        mesAtual: valorMesAtual,
+        contasVencidas,
+        contasPagas,
+        contasPendentes
+      };
+
+      console.log("Dados calculados:", newDashboardData);
+      setDashboardData(newDashboardData);
+      setContasProximas(contasVencemProximo.slice(0, 5)); // Mostrar apenas as 5 primeiras
+
+    } catch (error) {
+      console.error("Erro inesperado ao carregar dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const contasProximas: any[] = [];
+  useEffect(() => {
+    if (selectedEmpresa) {
+      loadDashboardData();
+    }
+  }, [selectedEmpresa]);
 
   const getNomeEmpresa = (id: string) => {
     const empresas: { [key: string]: string } = {
@@ -39,6 +157,25 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
     };
     return empresas[id] || id;
   };
+
+  const getStatus = (conta: Conta) => {
+    if (conta.total_pago >= conta.valor_total) return "pago";
+    const dataVencimento = new Date(conta.vencimento);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    dataVencimento.setHours(0, 0, 0, 0);
+    return dataVencimento < hoje ? "vencida" : "pendente";
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center p-8">
+          <p className="text-gray-600">Carregando dados do dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -171,22 +308,28 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
             </div>
           ) : (
             <div className="space-y-4">
-              {contasProximas.map((conta) => (
-                <div key={conta.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">{conta.descricao}</p>
-                    <p className="text-sm text-gray-600">Vencimento: {conta.vencimento}</p>
+              {contasProximas.map((conta) => {
+                const status = getStatus(conta);
+                const saldoRestante = conta.valor_total - conta.total_pago;
+                return (
+                  <div key={conta.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-gray-900">{conta.descricao}</p>
+                      <p className="text-sm text-gray-600">
+                        Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-lg text-gray-900">
+                        R$ {saldoRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <Badge variant={status === 'vencida' ? 'destructive' : 'secondary'}>
+                        {status === 'vencida' ? 'Vencida' : 'Pendente'}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg text-gray-900">
-                      R$ {conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    <Badge variant={conta.status === 'vencida' ? 'destructive' : 'secondary'}>
-                      {conta.status === 'vencida' ? 'Vencida' : 'Pendente'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,28 +24,28 @@ import {
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ContasAPagarProps {
   selectedEmpresa: string;
 }
 
 interface Pagamento {
-  id: number;
+  id: string;
   valor: number;
   data: string;
-  observacao?: string;
+  created_at: string;
 }
 
 interface Conta {
-  id: number;
+  id: string;
   descricao: string;
-  valorTotal: number;
-  valorPago: number;
+  valor_total: number;
+  total_pago: number;
   vencimento: string;
-  status: "pendente" | "pago" | "vencida";
   empresa: string;
-  pagamentos: Pagamento[];
-  arquivo?: string;
+  created_at: string;
+  pagamentos?: Pagamento[];
 }
 
 export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
@@ -55,12 +56,12 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   const [isPagamentoDialogOpen, setIsPagamentoDialogOpen] = useState(false);
   const [contaParaPagamento, setContaParaPagamento] = useState<Conta | null>(null);
   const [contas, setContas] = useState<Conta[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const [formData, setFormData] = useState({
     descricao: "",
     valorTotal: "",
     vencimento: "",
-    arquivo: ""
   });
 
   const [pagamentoData, setPagamentoData] = useState({
@@ -68,120 +69,139 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     observacao: ""
   });
 
-  const handleSave = () => {
-    console.log("=== INÍCIO DA FUNÇÃO SALVAR ===");
+  // Carregar contas do Supabase
+  const loadContas = async () => {
+    try {
+      setLoading(true);
+      console.log("Carregando contas para empresa:", selectedEmpresa);
+      
+      const { data: contasData, error: contasError } = await supabase
+        .from('contas')
+        .select('*')
+        .eq('empresa', selectedEmpresa)
+        .order('vencimento', { ascending: true });
+
+      if (contasError) {
+        console.error("Erro ao carregar contas:", contasError);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar contas do banco de dados",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Carregar pagamentos para cada conta
+      const contasComPagamentos = await Promise.all(
+        (contasData || []).map(async (conta) => {
+          const { data: pagamentos } = await supabase
+            .from('pagamentos')
+            .select('*')
+            .eq('conta_id', conta.id)
+            .order('data', { ascending: false });
+
+          return {
+            ...conta,
+            pagamentos: pagamentos || []
+          };
+        })
+      );
+
+      setContas(contasComPagamentos);
+      console.log("Contas carregadas:", contasComPagamentos);
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao carregar dados",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Carregar contas quando a empresa mudar
+  useEffect(() => {
+    if (selectedEmpresa) {
+      loadContas();
+    }
+  }, [selectedEmpresa]);
+
+  const handleSave = async () => {
+    console.log("=== SALVANDO CONTA NO SUPABASE ===");
     console.log("Dados do formulário:", formData);
     console.log("Empresa selecionada:", selectedEmpresa);
     
     try {
-      // Validação simples dos campos obrigatórios
-      if (!formData.descricao || formData.descricao.trim() === "") {
-        console.log("❌ ERRO: Descrição vazia");
+      // Validação
+      if (!formData.descricao.trim() || !formData.valorTotal.trim() || !formData.vencimento.trim()) {
         toast({
-          title: "Campo obrigatório",
-          description: "Por favor, preencha a descrição da conta",
+          title: "Campos obrigatórios",
+          description: "Preencha todos os campos obrigatórios",
           variant: "destructive",
         });
         return;
       }
 
-      if (!formData.valorTotal || formData.valorTotal.trim() === "") {
-        console.log("❌ ERRO: Valor total vazio");
-        toast({
-          title: "Campo obrigatório",
-          description: "Por favor, preencha o valor total",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!formData.vencimento || formData.vencimento.trim() === "") {
-        console.log("❌ ERRO: Data de vencimento vazia");
-        toast({
-          title: "Campo obrigatório",
-          description: "Por favor, selecione a data de vencimento",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Conversão do valor
       const valorNumerico = parseFloat(formData.valorTotal.replace(',', '.'));
-      console.log("Valor convertido:", valorNumerico);
-      
       if (isNaN(valorNumerico) || valorNumerico <= 0) {
-        console.log("❌ ERRO: Valor inválido:", valorNumerico);
         toast({
           title: "Valor inválido",
-          description: "Por favor, insira um valor válido maior que zero",
+          description: "Insira um valor válido maior que zero",
           variant: "destructive",
         });
         return;
       }
 
-      // Determinar status baseado na data
-      const dataVencimento = new Date(formData.vencimento);
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      dataVencimento.setHours(0, 0, 0, 0);
-      
-      const status = dataVencimento < hoje ? "vencida" : "pendente";
-      console.log("Status calculado:", status);
+      // Inserir no Supabase
+      const { data, error } = await supabase
+        .from('contas')
+        .insert({
+          descricao: formData.descricao.trim(),
+          empresa: selectedEmpresa,
+          valor_total: valorNumerico,
+          vencimento: formData.vencimento,
+          total_pago: 0
+        })
+        .select()
+        .single();
 
-      // Criar nova conta
-      const novaConta: Conta = {
-        id: Date.now(),
-        descricao: formData.descricao.trim(),
-        valorTotal: valorNumerico,
-        valorPago: 0,
-        vencimento: formData.vencimento,
-        status: status,
-        empresa: selectedEmpresa,
-        pagamentos: [],
-        arquivo: formData.arquivo || undefined
-      };
+      if (error) {
+        console.error("Erro do Supabase:", error);
+        toast({
+          title: "Erro ao salvar",
+          description: "Erro ao salvar conta no banco de dados",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      console.log("✅ Nova conta criada:", novaConta);
-      
-      // Atualizar lista de contas
-      setContas(contasAtuais => {
-        const novaLista = [...contasAtuais, novaConta];
-        console.log("✅ Lista atualizada. Total de contas:", novaLista.length);
-        return novaLista;
-      });
+      console.log("✅ Conta salva no Supabase:", data);
 
-      // Limpar formulário
-      setFormData({
-        descricao: "",
-        valorTotal: "",
-        vencimento: "",
-        arquivo: ""
-      });
-      console.log("✅ Formulário limpo");
-
-      // Fechar dialog
+      // Limpar formulário e fechar dialog
+      setFormData({ descricao: "", valorTotal: "", vencimento: "" });
       setIsDialogOpen(false);
-      console.log("✅ Dialog fechado");
 
-      // Mostrar sucesso
+      // Recarregar lista
+      await loadContas();
+
       toast({
         title: "✅ Sucesso!",
-        description: `Conta "${novaConta.descricao}" cadastrada com sucesso`,
+        description: `Conta "${data.descricao}" salva com sucesso`,
       });
-
-      console.log("=== CONTA SALVA COM SUCESSO ===");
 
     } catch (error) {
       console.error("❌ ERRO INESPERADO:", error);
       toast({
         title: "Erro inesperado",
-        description: "Ocorreu um erro ao salvar a conta. Tente novamente.",
+        description: "Ocorreu um erro ao salvar a conta",
         variant: "destructive",
       });
     }
   };
 
-  const handlePagamento = () => {
+  const handlePagamento = async () => {
     if (!contaParaPagamento || !pagamentoData.valor) {
       toast({
         title: "Erro",
@@ -191,66 +211,127 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       return;
     }
 
-    const valorPagamento = parseFloat(pagamentoData.valor.replace(',', '.'));
-    if (isNaN(valorPagamento) || valorPagamento <= 0) {
+    try {
+      const valorPagamento = parseFloat(pagamentoData.valor.replace(',', '.'));
+      if (isNaN(valorPagamento) || valorPagamento <= 0) {
+        toast({
+          title: "Erro",
+          description: "Valor do pagamento deve ser maior que zero",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const saldoRestante = contaParaPagamento.valor_total - contaParaPagamento.total_pago;
+      if (valorPagamento > saldoRestante) {
+        toast({
+          title: "Erro",
+          description: `Valor não pode ser maior que o saldo restante: R$ ${saldoRestante.toFixed(2)}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Inserir pagamento
+      const { error: pagamentoError } = await supabase
+        .from('pagamentos')
+        .insert({
+          conta_id: contaParaPagamento.id,
+          valor: valorPagamento,
+          data: new Date().toISOString().split('T')[0]
+        });
+
+      if (pagamentoError) {
+        console.error("Erro ao inserir pagamento:", pagamentoError);
+        toast({
+          title: "Erro",
+          description: "Erro ao registrar pagamento",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Atualizar total pago na conta
+      const novoTotalPago = contaParaPagamento.total_pago + valorPagamento;
+      const { error: contaError } = await supabase
+        .from('contas')
+        .update({ total_pago: novoTotalPago })
+        .eq('id', contaParaPagamento.id);
+
+      if (contaError) {
+        console.error("Erro ao atualizar conta:", contaError);
+        toast({
+          title: "Erro",
+          description: "Erro ao atualizar conta",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Limpar e fechar dialog
+      setPagamentoData({ valor: "", observacao: "" });
+      setIsPagamentoDialogOpen(false);
+      setContaParaPagamento(null);
+
+      // Recarregar lista
+      await loadContas();
+
+      toast({
+        title: "Sucesso!",
+        description: "Pagamento registrado com sucesso",
+      });
+
+    } catch (error) {
+      console.error("Erro inesperado:", error);
       toast({
         title: "Erro",
-        description: "Valor do pagamento deve ser maior que zero",
+        description: "Erro inesperado ao registrar pagamento",
         variant: "destructive",
       });
-      return;
     }
-
-    const saldoRestante = contaParaPagamento.valorTotal - contaParaPagamento.valorPago;
-    if (valorPagamento > saldoRestante) {
-      toast({
-        title: "Erro",
-        description: `Valor não pode ser maior que o saldo restante: R$ ${saldoRestante.toFixed(2)}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const novoPagamento: Pagamento = {
-      id: Date.now(),
-      valor: valorPagamento,
-      data: new Date().toISOString().split('T')[0],
-      observacao: pagamentoData.observacao
-    };
-
-    const novoValorPago = contaParaPagamento.valorPago + valorPagamento;
-    const novoStatus = novoValorPago >= contaParaPagamento.valorTotal ? "pago" : contaParaPagamento.status;
-
-    const contasAtualizadas = contas.map(conta => 
-      conta.id === contaParaPagamento.id 
-        ? {
-            ...conta,
-            valorPago: novoValorPago,
-            status: novoStatus,
-            pagamentos: [...conta.pagamentos, novoPagamento]
-          }
-        : conta
-    );
-
-    setContas(contasAtualizadas);
-    setPagamentoData({ valor: "", observacao: "" });
-    setIsPagamentoDialogOpen(false);
-    setContaParaPagamento(null);
-
-    toast({
-      title: "Sucesso!",
-      description: "Pagamento registrado com sucesso",
-    });
   };
 
-  const handleDelete = (contaId: number) => {
-    if (confirm("Tem certeza que deseja excluir esta conta?")) {
-      setContas(contas.filter(conta => conta.id !== contaId));
+  const handleDelete = async (contaId: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta conta?")) return;
+
+    try {
+      const { error } = await supabase
+        .from('contas')
+        .delete()
+        .eq('id', contaId);
+
+      if (error) {
+        console.error("Erro ao excluir:", error);
+        toast({
+          title: "Erro",
+          description: "Erro ao excluir conta",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await loadContas();
       toast({
         title: "Sucesso!",
         description: "Conta excluída com sucesso",
       });
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao excluir conta",
+        variant: "destructive",
+      });
     }
+  };
+
+  const getStatus = (conta: Conta) => {
+    if (conta.total_pago >= conta.valor_total) return "pago";
+    const dataVencimento = new Date(conta.vencimento);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    dataVencimento.setHours(0, 0, 0, 0);
+    return dataVencimento < hoje ? "vencida" : "pendente";
   };
 
   const getStatusBadge = (status: string) => {
@@ -276,26 +357,27 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   };
 
   const filteredContas = contas.filter(conta => {
-    const matchEmpresa = conta.empresa === selectedEmpresa;
+    const status = getStatus(conta);
     const matchSearch = conta.descricao.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchStatus = statusFilter === "all" || conta.status === statusFilter;
-    
-    return matchEmpresa && matchSearch && matchStatus;
+    const matchStatus = statusFilter === "all" || status === statusFilter;
+    return matchSearch && matchStatus;
   });
 
-  // Validação simplificada - apenas campos obrigatórios
   const isFormValid = Boolean(
     formData.descricao?.trim() && 
     formData.valorTotal?.trim() && 
     formData.vencimento?.trim()
   );
 
-  console.log("Validação do formulário:", { 
-    descricao: !!formData.descricao?.trim(),
-    valorTotal: !!formData.valorTotal?.trim(),
-    vencimento: !!formData.vencimento?.trim(),
-    isFormValid 
-  });
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center p-8">
+          <p className="text-gray-600">Carregando contas...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -319,10 +401,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   id="descricao" 
                   placeholder="Ex: Nota 234 - José Material de Construção" 
                   value={formData.descricao}
-                  onChange={(e) => {
-                    console.log("Descrição alterada para:", e.target.value);
-                    setFormData(prev => ({...prev, descricao: e.target.value}));
-                  }}
+                  onChange={(e) => setFormData(prev => ({...prev, descricao: e.target.value}))}
                   className="min-h-20"
                 />
               </div>
@@ -334,10 +413,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   step="0.01"
                   placeholder="0,00" 
                   value={formData.valorTotal}
-                  onChange={(e) => {
-                    console.log("Valor alterado para:", e.target.value);
-                    setFormData(prev => ({...prev, valorTotal: e.target.value}));
-                  }}
+                  onChange={(e) => setFormData(prev => ({...prev, valorTotal: e.target.value}))}
                 />
               </div>
               <div>
@@ -346,57 +422,23 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   id="vencimento" 
                   type="date" 
                   value={formData.vencimento}
-                  onChange={(e) => {
-                    console.log("Vencimento alterado para:", e.target.value);
-                    setFormData(prev => ({...prev, vencimento: e.target.value}));
-                  }}
+                  onChange={(e) => setFormData(prev => ({...prev, vencimento: e.target.value}))}
                 />
-              </div>
-              <div>
-                <Label htmlFor="arquivo">Anexar Arquivo (Opcional)</Label>
-                <div className="flex items-center gap-2">
-                  <Input 
-                    id="arquivo" 
-                    type="file" 
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      const fileName = file?.name || "";
-                      console.log("Arquivo selecionado:", fileName);
-                      setFormData(prev => ({...prev, arquivo: fileName}));
-                    }}
-                    className="flex-1"
-                  />
-                  <Paperclip className="h-4 w-4 text-gray-400" />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Este campo é totalmente opcional</p>
               </div>
               <div className="flex gap-2 pt-4">
                 <Button 
-                  type="button"
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  onClick={(e) => {
-                    console.log("🔘 BOTÃO SALVAR CLICADO");
-                    e.preventDefault();
-                    handleSave();
-                  }}
+                  onClick={handleSave}
                   disabled={!isFormValid}
                 >
                   Salvar
                 </Button>
                 <Button 
-                  type="button"
                   variant="outline" 
                   className="flex-1" 
                   onClick={() => {
-                    console.log("Botão Cancelar clicado");
                     setIsDialogOpen(false);
-                    setFormData({
-                      descricao: "",
-                      valorTotal: "",
-                      vencimento: "",
-                      arquivo: ""
-                    });
+                    setFormData({ descricao: "", valorTotal: "", vencimento: "" });
                   }}
                 >
                   Cancelar
@@ -417,10 +459,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="font-medium">{contaParaPagamento.descricao}</p>
-                <p className="text-sm text-gray-600">Valor Total: R$ {contaParaPagamento.valorTotal.toFixed(2)}</p>
-                <p className="text-sm text-gray-600">Já Pago: R$ {contaParaPagamento.valorPago.toFixed(2)}</p>
+                <p className="text-sm text-gray-600">Valor Total: R$ {contaParaPagamento.valor_total.toFixed(2)}</p>
+                <p className="text-sm text-gray-600">Já Pago: R$ {contaParaPagamento.total_pago.toFixed(2)}</p>
                 <p className="text-sm font-medium text-red-600">
-                  Saldo: R$ {(contaParaPagamento.valorTotal - contaParaPagamento.valorPago).toFixed(2)}
+                  Saldo: R$ {(contaParaPagamento.valor_total - contaParaPagamento.total_pago).toFixed(2)}
                 </p>
               </div>
               <div>
@@ -430,18 +472,9 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   type="number" 
                   step="0.01"
                   placeholder="0,00"
-                  max={contaParaPagamento.valorTotal - contaParaPagamento.valorPago}
+                  max={contaParaPagamento.valor_total - contaParaPagamento.total_pago}
                   value={pagamentoData.valor}
                   onChange={(e) => setPagamentoData({...pagamentoData, valor: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="observacaoPagamento">Observação</Label>
-                <Textarea 
-                  id="observacaoPagamento" 
-                  placeholder="Observações sobre o pagamento..." 
-                  value={pagamentoData.observacao}
-                  onChange={(e) => setPagamentoData({...pagamentoData, observacao: e.target.value})}
                 />
               </div>
               <div className="flex gap-2 pt-4">
@@ -514,80 +547,77 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredContas.map((conta) => (
-                <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    {getStatusIcon(conta.status)}
-                    <div>
-                      <h3 className="font-medium text-gray-900">{conta.descricao}</h3>
-                      <p className="text-sm text-gray-600">Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}</p>
-                      {conta.valorPago > 0 && conta.status !== "pago" && (
-                        <p className="text-xs text-blue-600">
-                          Pago: R$ {conta.valorPago.toFixed(2)} | Saldo: R$ {(conta.valorTotal - conta.valorPago).toFixed(2)}
-                        </p>
-                      )}
-                      {conta.arquivo && (
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                          <Paperclip className="h-3 w-3" />
-                          {conta.arquivo}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="font-bold text-lg text-gray-900">
-                        R$ {conta.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    
-                    {getStatusBadge(conta.status)}
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem>
-                          <Eye className="h-4 w-4 mr-2" />
-                          Visualizar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        {conta.status !== "pago" && (
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              setContaParaPagamento(conta);
-                              setIsPagamentoDialogOpen(true);
-                            }}
-                          >
-                            <DollarSign className="h-4 w-4 mr-2" />
-                            Registrar Pagamento
-                          </DropdownMenuItem>
+              {filteredContas.map((conta) => {
+                const status = getStatus(conta);
+                return (
+                  <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      {getStatusIcon(status)}
+                      <div>
+                        <h3 className="font-medium text-gray-900">{conta.descricao}</h3>
+                        <p className="text-sm text-gray-600">Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}</p>
+                        {conta.total_pago > 0 && status !== "pago" && (
+                          <p className="text-xs text-blue-600">
+                            Pago: R$ {conta.total_pago.toFixed(2)} | Saldo: R$ {(conta.valor_total - conta.total_pago).toFixed(2)}
+                          </p>
                         )}
-                        {conta.pagamentos.length > 0 && (
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="font-bold text-lg text-gray-900">
+                          R$ {conta.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      
+                      {getStatusBadge(status)}
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
                           <DropdownMenuItem>
-                            <History className="h-4 w-4 mr-2" />
-                            Histórico ({conta.pagamentos.length} pagamentos)
+                            <Eye className="h-4 w-4 mr-2" />
+                            Visualizar
                           </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem 
-                          className="text-red-600"
-                          onClick={() => handleDelete(conta.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <DropdownMenuItem>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          {status !== "pago" && (
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                setContaParaPagamento(conta);
+                                setIsPagamentoDialogOpen(true);
+                              }}
+                            >
+                              <DollarSign className="h-4 w-4 mr-2" />
+                              Registrar Pagamento
+                            </DropdownMenuItem>
+                          )}
+                          {conta.pagamentos && conta.pagamentos.length > 0 && (
+                            <DropdownMenuItem>
+                              <History className="h-4 w-4 mr-2" />
+                              Histórico ({conta.pagamentos.length} pagamentos)
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDelete(conta.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
