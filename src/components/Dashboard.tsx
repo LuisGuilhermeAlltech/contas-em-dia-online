@@ -54,9 +54,13 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       setLoading(true);
       console.log("Carregando dados do dashboard para empresa:", selectedEmpresa);
 
+      // Carregar contas com join manual para calcular os dados
       const { data: contas, error } = await supabase
-        .from('contas_view')
-        .select('*')
+        .from('contas')
+        .select(`
+          *,
+          pagamentos(valor)
+        `)
         .eq('empresa', selectedEmpresa);
 
       if (error) {
@@ -69,7 +73,32 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
         return;
       }
 
-      console.log("Contas carregadas para dashboard:", contas);
+      // Processar dados e calcular saldos
+      const contasProcessadas: ContaView[] = contas.map(conta => {
+        const totalPago = conta.pagamentos?.reduce((sum: number, p: any) => sum + (p.valor || 0), 0) || 0;
+        const saldo = conta.valor_total - totalPago;
+        let status: 'Pago' | 'Parcial' | 'Pendente' = 'Pendente';
+        
+        if (saldo <= 0) {
+          status = 'Pago';
+        } else if (totalPago > 0) {
+          status = 'Parcial';
+        }
+
+        return {
+          id: conta.id,
+          descricao: conta.descricao,
+          empresa: conta.empresa,
+          valor_total: conta.valor_total,
+          vencimento: conta.vencimento,
+          total_pago: totalPago,
+          saldo: saldo,
+          status: status,
+          created_at: conta.created_at
+        } as ContaView;
+      });
+
+      console.log("Contas processadas para dashboard:", contasProcessadas);
 
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
@@ -90,7 +119,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       let contasPendentes = 0;
       const contasVencemProximo: ContaView[] = [];
 
-      contas.forEach(conta => {
+      contasProcessadas.forEach(conta => {
         const vencimento = new Date(conta.vencimento);
         vencimento.setHours(0, 0, 0, 0);
         

@@ -72,19 +72,59 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       setLoading(true);
       console.log("Carregando contas da view para empresa:", selectedEmpresa);
       
+      // Usar .rpc() para chamar a view como se fosse uma função
       const { data: contasData, error } = await supabase
-        .from('contas_view')
-        .select('*')
-        .eq('empresa', selectedEmpresa)
-        .order('vencimento', { ascending: true });
+        .rpc('get_contas_view', { empresa_filter: selectedEmpresa });
 
       if (error) {
         console.error("Erro ao carregar contas:", error);
-        toast({
-          title: "Erro",
-          description: "Erro ao carregar contas do banco de dados",
-          variant: "destructive",
+        // Fallback: tentar query direta na view
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('contas')
+          .select(`
+            *,
+            pagamentos(valor)
+          `)
+          .eq('empresa', selectedEmpresa)
+          .order('vencimento', { ascending: true });
+
+        if (fallbackError) {
+          console.error("Erro no fallback:", fallbackError);
+          toast({
+            title: "Erro",
+            description: "Erro ao carregar contas do banco de dados",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Calcular saldo e status manualmente
+        const contasComSaldo = (fallbackData || []).map(conta => {
+          const totalPago = conta.pagamentos?.reduce((sum: number, p: any) => sum + (p.valor || 0), 0) || 0;
+          const saldo = conta.valor_total - totalPago;
+          let status: 'Pago' | 'Parcial' | 'Pendente' = 'Pendente';
+          
+          if (saldo <= 0) {
+            status = 'Pago';
+          } else if (totalPago > 0) {
+            status = 'Parcial';
+          }
+
+          return {
+            id: conta.id,
+            descricao: conta.descricao,
+            empresa: conta.empresa,
+            valor_total: conta.valor_total,
+            vencimento: conta.vencimento,
+            total_pago: totalPago,
+            saldo: saldo,
+            status: status,
+            created_at: conta.created_at
+          } as ContaView;
         });
+
+        setContas(contasComSaldo);
+        console.log("Contas carregadas (fallback):", contasComSaldo);
         return;
       }
 

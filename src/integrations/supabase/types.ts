@@ -98,11 +98,32 @@ export type Database = {
             referencedRelation: "contas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pagamentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      contas_view: {
+        Row: {
+          created_at: string | null
+          descricao: string | null
+          empresa: string | null
+          id: string | null
+          pagamentos_acumulados: number | null
+          saldo: number | null
+          status: string | null
+          total_pago: number | null
+          valor_total: number | null
+          vencimento: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
