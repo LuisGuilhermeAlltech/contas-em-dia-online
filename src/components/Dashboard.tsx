@@ -11,22 +11,13 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface DashboardProps {
   selectedEmpresa: string;
 }
 
-interface ContaView {
-  id: string;
-  descricao: string;
-  empresa: string;
-  valor_total: number;
-  vencimento: string;
-  total_pago: number;
-  saldo: number;
-  status: 'Pago' | 'Parcial' | 'Pendente';
-  created_at: string;
-}
+type ContaView = Tables<'contas_view'>;
 
 interface DashboardData {
   totalHoje: number;
@@ -54,13 +45,10 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       setLoading(true);
       console.log("Carregando dados do dashboard para empresa:", selectedEmpresa);
 
-      // Carregar contas com join manual para calcular os dados
+      // Carregar contas da view
       const { data: contas, error } = await supabase
-        .from('contas')
-        .select(`
-          *,
-          pagamentos(valor)
-        `)
+        .from('contas_view')
+        .select('*')
         .eq('empresa', selectedEmpresa);
 
       if (error) {
@@ -73,32 +61,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
         return;
       }
 
-      // Processar dados e calcular saldos
-      const contasProcessadas: ContaView[] = contas.map(conta => {
-        const totalPago = conta.pagamentos?.reduce((sum: number, p: any) => sum + (p.valor || 0), 0) || 0;
-        const saldo = conta.valor_total - totalPago;
-        let status: 'Pago' | 'Parcial' | 'Pendente' = 'Pendente';
-        
-        if (saldo <= 0) {
-          status = 'Pago';
-        } else if (totalPago > 0) {
-          status = 'Parcial';
-        }
-
-        return {
-          id: conta.id,
-          descricao: conta.descricao,
-          empresa: conta.empresa,
-          valor_total: conta.valor_total,
-          vencimento: conta.vencimento,
-          total_pago: totalPago,
-          saldo: saldo,
-          status: status,
-          created_at: conta.created_at
-        } as ContaView;
-      });
-
-      console.log("Contas processadas para dashboard:", contasProcessadas);
+      console.log("Contas processadas para dashboard:", contas);
 
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
@@ -119,7 +82,9 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       let contasPendentes = 0;
       const contasVencemProximo: ContaView[] = [];
 
-      contasProcessadas.forEach(conta => {
+      contas.forEach(conta => {
+        if (!conta.vencimento) return;
+        
         const vencimento = new Date(conta.vencimento);
         vencimento.setHours(0, 0, 0, 0);
         
@@ -128,18 +93,18 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
 
         // Total Hoje → SUM(saldo) vencimento = hoje
         if (vencimento.getTime() === hoje.getTime() && !isPago) {
-          totalHoje += conta.saldo;
+          totalHoje += conta.saldo || 0;
         }
 
         // Próx. Semana → vencimento ≤ hoje+7
         if (vencimento <= proximaSemana && vencimento >= hoje && !isPago) {
-          valorProximaSemana += conta.saldo;
+          valorProximaSemana += conta.saldo || 0;
           contasVencemProximo.push(conta);
         }
 
         // Mês Atual → vencimento dentro do mês
         if (vencimento >= inicioMes && vencimento <= fimMes && !isPago) {
-          valorMesAtual += conta.saldo;
+          valorMesAtual += conta.saldo || 0;
         }
 
         // Contadores por status
@@ -334,15 +299,15 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
                   <div>
                     <p className="font-medium text-gray-900">{conta.descricao}</p>
                     <p className="text-sm text-gray-600">
-                      Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}
+                      Vencimento: {conta.vencimento ? new Date(conta.vencimento).toLocaleDateString('pt-BR') : '-'}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-lg text-gray-900">
-                      R$ {conta.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                     <Badge variant={conta.status === 'Pago' ? 'default' : (conta.status === 'Parcial' ? 'secondary' : 'secondary')}>
-                      {conta.status}
+                      {conta.status || 'Pendente'}
                     </Badge>
                   </div>
                 </div>

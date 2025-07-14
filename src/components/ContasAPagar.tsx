@@ -19,22 +19,13 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface ContasAPagarProps {
   selectedEmpresa: string;
 }
 
-interface ContaView {
-  id: string;
-  descricao: string;
-  empresa: string;
-  valor_total: number;
-  vencimento: string;
-  total_pago: number;
-  saldo: number;
-  status: 'Pago' | 'Parcial' | 'Pendente';
-  created_at: string;
-}
+type ContaView = Tables<'contas_view'>;
 
 export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   const { toast } = useToast();
@@ -56,75 +47,26 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     valor: ""
   });
 
-  const getEmpresaValue = (empresaNome: string) => {
-    const empresaMap: { [key: string]: string } = {
-      "Grupo Líder": "grupo-lider",
-      "Alltech Matriz": "alltech-matriz", 
-      "Alltech Filial": "alltech-filial",
-      "Luis Guilherme": "luis-guilherme"
-    };
-    return empresaMap[empresaNome] || selectedEmpresa;
-  };
-
   // Carregar contas da view contas_view
   const loadContas = async () => {
     try {
       setLoading(true);
       console.log("Carregando contas da view para empresa:", selectedEmpresa);
       
-      // Usar .rpc() para chamar a view como se fosse uma função
+      // Usar query direta na view
       const { data: contasData, error } = await supabase
-        .rpc('get_contas_view', { empresa_filter: selectedEmpresa });
+        .from('contas_view')
+        .select('*')
+        .eq('empresa', selectedEmpresa)
+        .order('vencimento', { ascending: true });
 
       if (error) {
         console.error("Erro ao carregar contas:", error);
-        // Fallback: tentar query direta na view
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('contas')
-          .select(`
-            *,
-            pagamentos(valor)
-          `)
-          .eq('empresa', selectedEmpresa)
-          .order('vencimento', { ascending: true });
-
-        if (fallbackError) {
-          console.error("Erro no fallback:", fallbackError);
-          toast({
-            title: "Erro",
-            description: "Erro ao carregar contas do banco de dados",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Calcular saldo e status manualmente
-        const contasComSaldo = (fallbackData || []).map(conta => {
-          const totalPago = conta.pagamentos?.reduce((sum: number, p: any) => sum + (p.valor || 0), 0) || 0;
-          const saldo = conta.valor_total - totalPago;
-          let status: 'Pago' | 'Parcial' | 'Pendente' = 'Pendente';
-          
-          if (saldo <= 0) {
-            status = 'Pago';
-          } else if (totalPago > 0) {
-            status = 'Parcial';
-          }
-
-          return {
-            id: conta.id,
-            descricao: conta.descricao,
-            empresa: conta.empresa,
-            valor_total: conta.valor_total,
-            vencimento: conta.vencimento,
-            total_pago: totalPago,
-            saldo: saldo,
-            status: status,
-            created_at: conta.created_at
-          } as ContaView;
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar contas do banco de dados",
+          variant: "destructive",
         });
-
-        setContas(contasComSaldo);
-        console.log("Contas carregadas (fallback):", contasComSaldo);
         return;
       }
 
@@ -242,10 +184,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         return;
       }
 
-      if (valorPagamento > contaParaPagamento.saldo) {
+      if (valorPagamento > (contaParaPagamento.saldo || 0)) {
         toast({
           title: "Erro",
-          description: `Valor não pode ser maior que o saldo restante: R$ ${contaParaPagamento.saldo.toFixed(2)}`,
+          description: `Valor não pode ser maior que o saldo restante: R$ ${(contaParaPagamento.saldo || 0).toFixed(2)}`,
           variant: "destructive",
         });
         return;
@@ -255,7 +197,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       const { error: pagamentoError } = await supabase
         .from('pagamentos')
         .insert({
-          conta_id: contaParaPagamento.id,
+          conta_id: contaParaPagamento.id!,
           valor: valorPagamento,
           data: new Date().toISOString().split('T')[0]
         });
@@ -339,8 +281,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   };
 
   const filteredContas = contas.filter(conta => {
-    const matchSearch = conta.descricao.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchStatus = statusFilter === "all" || conta.status.toLowerCase() === statusFilter;
+    const matchSearch = (conta.descricao || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = statusFilter === "all" || (conta.status || '').toLowerCase() === statusFilter;
     return matchSearch && matchStatus;
   });
 
@@ -440,10 +382,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="font-medium">{contaParaPagamento.descricao}</p>
-                <p className="text-sm text-gray-600">Valor Total: R$ {contaParaPagamento.valor_total.toFixed(2)}</p>
-                <p className="text-sm text-gray-600">Já Pago: R$ {contaParaPagamento.total_pago.toFixed(2)}</p>
+                <p className="text-sm text-gray-600">Valor Total: R$ {(contaParaPagamento.valor_total || 0).toFixed(2)}</p>
+                <p className="text-sm text-gray-600">Já Pago: R$ {(contaParaPagamento.total_pago || 0).toFixed(2)}</p>
                 <p className="text-sm font-medium text-red-600">
-                  Saldo: R$ {contaParaPagamento.saldo.toFixed(2)}
+                  Saldo: R$ {(contaParaPagamento.saldo || 0).toFixed(2)}
                 </p>
               </div>
               <div>
@@ -453,7 +395,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   type="number" 
                   step="0.01"
                   placeholder="0,00"
-                  max={contaParaPagamento.saldo}
+                  max={contaParaPagamento.saldo || 0}
                   value={pagamentoData.valor}
                   onChange={(e) => setPagamentoData({valor: e.target.value})}
                 />
@@ -533,11 +475,11 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   <div className="flex-1">
                     <h3 className="font-medium text-gray-900">{conta.descricao}</h3>
                     <p className="text-sm text-gray-600">
-                      Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}
+                      Vencimento: {conta.vencimento ? new Date(conta.vencimento).toLocaleDateString('pt-BR') : '-'}
                     </p>
                     {conta.status === "Parcial" && (
                       <p className="text-xs text-blue-600">
-                        Pago: R$ {conta.total_pago.toFixed(2)} | Saldo: R$ {conta.saldo.toFixed(2)}
+                        Pago: R$ {(conta.total_pago || 0).toFixed(2)} | Saldo: R$ {(conta.saldo || 0).toFixed(2)}
                       </p>
                     )}
                   </div>
@@ -545,14 +487,14 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="font-bold text-lg text-gray-900">
-                        R$ {conta.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Total: R$ {conta.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        Total: R$ {(conta.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     
-                    {getStatusBadge(conta.status)}
+                    {getStatusBadge(conta.status || 'Pendente')}
                     
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -574,7 +516,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                         )}
                         <DropdownMenuItem 
                           className="text-red-600"
-                          onClick={() => handleDelete(conta.id)}
+                          onClick={() => handleDelete(conta.id!)}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Excluir
