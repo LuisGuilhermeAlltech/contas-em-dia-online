@@ -8,7 +8,7 @@ import { Relatorios } from "@/components/Relatorios";
 import { OfflineInstaller } from "@/components/OfflineInstaller";
 import { OfflineStatus } from "@/components/OfflineStatus";
 import { Button } from "@/components/ui/button";
-import { Menu } from "lucide-react";
+import { Menu, Download } from "lucide-react";
 
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
@@ -60,6 +60,15 @@ const Index = () => {
               </h1>
             </div>
             <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveMenu("instalador")}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Instalar App
+              </Button>
               <OfflineStatus />
             </div>
           </div>
