@@ -8,7 +8,8 @@ import {
   FileText, 
   Building2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from "lucide-react";
 
 interface SidebarProps {
@@ -33,6 +34,7 @@ export const Sidebar = ({
     { id: "contas", label: "Contas a Pagar", icon: CreditCard },
     { id: "fornecedores", label: "Fornecedores", icon: Users },
     { id: "relatorios", label: "Relatórios", icon: FileText },
+    { id: "instalador", label: "Instalador Offline", icon: Download },
   ];
 
   const empresas = [

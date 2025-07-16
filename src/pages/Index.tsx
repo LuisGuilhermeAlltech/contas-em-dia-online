@@ -5,6 +5,8 @@ import { Dashboard } from "@/components/Dashboard";
 import { ContasAPagar } from "@/components/ContasAPagar";
 import { Fornecedores } from "@/components/Fornecedores";
 import { Relatorios } from "@/components/Relatorios";
+import { OfflineInstaller } from "@/components/OfflineInstaller";
+import { OfflineStatus } from "@/components/OfflineStatus";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 
@@ -23,6 +25,8 @@ const Index = () => {
         return <Fornecedores selectedEmpresa={selectedEmpresa} />;
       case "relatorios":
         return <Relatorios selectedEmpresa={selectedEmpresa} />;
+      case "instalador":
+        return <OfflineInstaller />;
       default:
         return <Dashboard selectedEmpresa={selectedEmpresa} />;
     }
@@ -54,6 +58,9 @@ const Index = () => {
               <h1 className="text-2xl font-bold text-gray-900">
                 Sistema de Controle Financeiro
               </h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <OfflineStatus />
             </div>
           </div>
         </header>
