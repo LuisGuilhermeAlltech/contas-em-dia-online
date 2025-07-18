@@ -475,7 +475,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   <div className="flex-1">
                     <h3 className="font-medium text-gray-900">{conta.descricao}</h3>
                     <p className="text-sm text-gray-600">
-                      Vencimento: {conta.vencimento ? new Date(conta.vencimento).toLocaleDateString('pt-BR') : '-'}
+                      Vencimento: {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                     </p>
                     {conta.status === "Parcial" && (
                       <p className="text-xs text-blue-600">
