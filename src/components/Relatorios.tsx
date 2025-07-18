@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,32 +14,102 @@ import {
   PieChart,
   TrendingUp
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface RelatoriosProps {
   selectedEmpresa: string;
 }
 
+type ContaView = Tables<'contas_view'>;
+
 export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
   const [tipoRelatorio, setTipoRelatorio] = useState("contas-pagas");
   const [periodoInicio, setPeriodoInicio] = useState("");
   const [periodoFim, setPeriodoFim] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [contas, setContas] = useState<ContaView[]>([]);
+  const [resumoFinanceiro, setResumoFinanceiro] = useState({
+    totalPago: 0,
+    totalPendente: 0,
+    totalVencido: 0,
+    contasPagas: 0,
+    contasPendentes: 0,
+    contasVencidas: 0
+  });
 
-  // Dados fictícios para demonstração
-  const resumoFinanceiro = {
-    totalPago: 12450.80,
-    totalPendente: 8750.30,
-    totalVencido: 2150.00,
-    contasPagas: 18,
-    contasPendentes: 7,
-    contasVencidas: 2
+  const loadRelatoriosData = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('contas_view')
+        .select('*')
+        .eq('empresa', selectedEmpresa);
+
+      if (error) {
+        console.error("Erro ao carregar dados:", error);
+        toast.error("Erro ao carregar dados do relatório");
+        return;
+      }
+
+      if (!data) return;
+
+      setContas(data);
+      
+      // Calcular resumo financeiro
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      
+      let totalPago = 0;
+      let totalPendente = 0;
+      let totalVencido = 0;
+      let contasPagas = 0;
+      let contasPendentes = 0;
+      let contasVencidas = 0;
+
+      data.forEach(conta => {
+        if (!conta.vencimento) return;
+        
+        const vencimento = new Date(conta.vencimento + 'T00:00:00');
+        const isPago = conta.status === 'Pago';
+        const isVencida = conta.status !== 'Pago' && vencimento < hoje;
+
+        if (isPago) {
+          totalPago += conta.valor_total || 0;
+          contasPagas++;
+        } else if (isVencida) {
+          totalVencido += conta.saldo || 0;
+          contasVencidas++;
+        } else {
+          totalPendente += conta.saldo || 0;
+          contasPendentes++;
+        }
+      });
+
+      setResumoFinanceiro({
+        totalPago,
+        totalPendente,
+        totalVencido,
+        contasPagas,
+        contasPendentes,
+        contasVencidas
+      });
+
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+      toast.error("Erro inesperado ao carregar relatórios");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const contasPorCategoria = [
-    { categoria: "Utilidades", valor: 1250.50, porcentagem: 35 },
-    { categoria: "Aluguel", valor: 2500.00, porcentagem: 45 },
-    { categoria: "Material", valor: 680.30, porcentagem: 12 },
-    { categoria: "Serviços", valor: 420.00, porcentagem: 8 }
-  ];
+  useEffect(() => {
+    if (selectedEmpresa) {
+      loadRelatoriosData();
+    }
+  }, [selectedEmpresa]);
 
   const relatóriosDisponiveis = [
     {
@@ -68,9 +138,67 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
     }
   ];
 
+  const getFilteredContas = () => {
+    let filteredContas = [...contas];
+
+    // Filtrar por tipo de relatório
+    switch (tipoRelatorio) {
+      case "contas-pagas":
+        filteredContas = filteredContas.filter(conta => conta.status === 'Pago');
+        break;
+      case "contas-pendentes":
+        filteredContas = filteredContas.filter(conta => conta.status !== 'Pago');
+        break;
+    }
+
+    // Filtrar por período se especificado
+    if (periodoInicio && periodoFim) {
+      const inicio = new Date(periodoInicio + 'T00:00:00');
+      const fim = new Date(periodoFim + 'T23:59:59');
+      
+      filteredContas = filteredContas.filter(conta => {
+        if (!conta.vencimento) return false;
+        const vencimento = new Date(conta.vencimento + 'T00:00:00');
+        return vencimento >= inicio && vencimento <= fim;
+      });
+    }
+
+    return filteredContas;
+  };
+
   const handleExportReport = (format: string) => {
-    console.log(`Exportando relatório em formato ${format}...`);
-    // Aqui você implementaria a lógica de exportação
+    const filteredContas = getFilteredContas();
+    
+    if (filteredContas.length === 0) {
+      toast.error("Nenhuma conta encontrada para o filtro aplicado");
+      return;
+    }
+
+    const csvContent = generateCSV(filteredContas);
+    downloadFile(csvContent, `relatorio-${tipoRelatorio}-${selectedEmpresa}.csv`);
+    toast.success(`Relatório exportado em formato ${format.toUpperCase()}`);
+  };
+
+  const generateCSV = (contasData: ContaView[]) => {
+    const headers = ['Descrição', 'Vencimento', 'Valor Total', 'Total Pago', 'Saldo', 'Status'];
+    const rows = contasData.map(conta => [
+      conta.descricao || '',
+      conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '',
+      (conta.valor_total || 0).toFixed(2),
+      (conta.total_pago || 0).toFixed(2),
+      (conta.saldo || 0).toFixed(2),
+      conta.status || ''
+    ]);
+
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+  };
+
+  const downloadFile = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
   };
 
   return (
@@ -230,34 +358,69 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
         })}
       </div>
 
-      {/* Análise por Categoria */}
+      {/* Preview do Relatório */}
       <Card>
         <CardHeader>
-          <CardTitle>Gastos por Categoria</CardTitle>
+          <CardTitle>Visualizar Dados do Relatório</CardTitle>
+          <p className="text-sm text-gray-600">
+            {getFilteredContas().length} registros encontrados
+          </p>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {contasPorCategoria.map((categoria, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 bg-blue-600 rounded-full"></div>
-                  <span className="font-medium">{categoria.categoria}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full" 
-                      style={{ width: `${categoria.porcentagem}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-sm text-gray-600 w-12">{categoria.porcentagem}%</span>
-                  <span className="font-bold text-gray-900 w-24 text-right">
-                    R$ {categoria.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Carregando dados...</p>
+            </div>
+          ) : getFilteredContas().length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">Nenhuma conta encontrada para os filtros aplicados</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Descrição</th>
+                    <th className="text-left p-2">Vencimento</th>
+                    <th className="text-right p-2">Valor Total</th>
+                    <th className="text-right p-2">Saldo</th>
+                    <th className="text-center p-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getFilteredContas().slice(0, 10).map((conta) => (
+                    <tr key={conta.id} className="border-b hover:bg-gray-50">
+                      <td className="p-2">{conta.descricao}</td>
+                      <td className="p-2">
+                        {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                      </td>
+                      <td className="p-2 text-right">
+                        R$ {(conta.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-2 text-right">
+                        R$ {(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-2 text-center">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          conta.status === 'Pago' 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {conta.status || 'Pendente'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {getFilteredContas().length > 10 && (
+                <p className="text-sm text-gray-500 mt-2 text-center">
+                  ... e mais {getFilteredContas().length - 10} registros
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

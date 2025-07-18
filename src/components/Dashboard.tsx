@@ -110,7 +110,10 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
 
         // Contadores por status
         if (isPago) {
-          contasPagas++;
+          // Contar apenas contas pagas do mês atual
+          if (vencimento >= inicioMes && vencimento <= fimMes) {
+            contasPagas++;
+          }
         } else if (isVencida) {
           contasVencidas++;
         } else {
