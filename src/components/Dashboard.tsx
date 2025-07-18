@@ -85,7 +85,8 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       contas.forEach(conta => {
         if (!conta.vencimento) return;
         
-        const vencimento = new Date(conta.vencimento);
+        // Corrigir parsing da data para evitar problema de timezone
+        const vencimento = new Date(conta.vencimento + 'T00:00:00');
         vencimento.setHours(0, 0, 0, 0);
         
         const isPago = conta.status === 'Pago';
@@ -299,7 +300,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
                   <div>
                     <p className="font-medium text-gray-900">{conta.descricao}</p>
                     <p className="text-sm text-gray-600">
-                      Vencimento: {conta.vencimento ? new Date(conta.vencimento).toLocaleDateString('pt-BR') : '-'}
+                      Vencimento: {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                     </p>
                   </div>
                   <div className="text-right">
