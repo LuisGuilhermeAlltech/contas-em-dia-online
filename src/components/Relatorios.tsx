@@ -174,6 +174,10 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
   const calcularResumoPeriodo = () => {
     const filteredContas = getFilteredContas();
     
+    console.log("Calculando resumo do período...");
+    console.log("Contas filtradas:", filteredContas.length);
+    console.log("Período:", periodoInicio, "até", periodoFim);
+    
     let totalPago = 0;
     let totalAPagar = 0;
     
@@ -185,11 +189,16 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
       }
     });
 
+    console.log("Total pago:", totalPago);
+    console.log("Total a pagar:", totalAPagar);
+
     setResumoPeriodo({
       totalPago,
       totalAPagar,
       totalContas: filteredContas.length
     });
+    
+    toast.success(`Resumo calculado: ${filteredContas.length} contas encontradas`);
   };
 
   const handleExportReport = (format: string) => {
