@@ -38,6 +38,11 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
     contasPendentes: 0,
     contasVencidas: 0
   });
+  const [resumoPeriodo, setResumoPeriodo] = useState({
+    totalPago: 0,
+    totalAPagar: 0,
+    totalContas: 0
+  });
 
   const loadRelatoriosData = async () => {
     try {
@@ -164,6 +169,27 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
     }
 
     return filteredContas;
+  };
+
+  const calcularResumoPeriodo = () => {
+    const filteredContas = getFilteredContas();
+    
+    let totalPago = 0;
+    let totalAPagar = 0;
+    
+    filteredContas.forEach(conta => {
+      if (conta.status === 'Pago') {
+        totalPago += conta.valor_total || 0;
+      } else {
+        totalAPagar += conta.saldo || 0;
+      }
+    });
+
+    setResumoPeriodo({
+      totalPago,
+      totalAPagar,
+      totalContas: filteredContas.length
+    });
   };
 
   const handleExportReport = (format: string) => {
@@ -300,6 +326,13 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
             
             <div className="flex items-end gap-2">
               <Button 
+                onClick={calcularResumoPeriodo}
+                className="bg-blue-600 hover:bg-blue-700 flex-1"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Calcular
+              </Button>
+              <Button 
                 onClick={() => handleExportReport('pdf')}
                 className="bg-red-600 hover:bg-red-700 flex-1"
               >
@@ -317,6 +350,40 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Resumo do Período Selecionado */}
+      {(periodoInicio && periodoFim && resumoPeriodo.totalContas > 0) && (
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-blue-700">Resumo do Período Selecionado</CardTitle>
+            <p className="text-sm text-blue-600">
+              {new Date(periodoInicio + 'T00:00:00').toLocaleDateString('pt-BR')} até {new Date(periodoFim + 'T00:00:00').toLocaleDateString('pt-BR')}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-sm text-gray-600">Total Pago</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">
+                  R$ {resumoPeriodo.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-sm text-gray-600">Total a Pagar</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {resumoPeriodo.totalContas}
+                </div>
+                <p className="text-sm text-gray-600">Total de Contas</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tipos de Relatórios */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
