@@ -168,6 +168,13 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
       });
     }
 
+    // Ordenar por data de vencimento em ordem crescente
+    filteredContas.sort((a, b) => {
+      const aDate = a.vencimento ? new Date(a.vencimento + 'T00:00:00').getTime() : Infinity;
+      const bDate = b.vencimento ? new Date(b.vencimento + 'T00:00:00').getTime() : Infinity;
+      return aDate - bDate;
+    });
+
     return filteredContas;
   };
 
