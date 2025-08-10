@@ -370,7 +370,7 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
             </p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
                   R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -388,6 +388,73 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
                   {resumoPeriodo.totalContas}
                 </div>
                 <p className="text-sm text-gray-600">Total de Contas</p>
+              </div>
+            </div>
+            
+            {/* Tabela detalhada de todas as contas do período */}
+            <div className="mt-6">
+              <h4 className="text-lg font-semibold mb-3 text-blue-700">Detalhes das Contas do Período</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse bg-white rounded-lg overflow-hidden shadow">
+                  <thead>
+                    <tr className="bg-blue-600 text-white">
+                      <th className="border px-4 py-3 text-left">Empresa</th>
+                      <th className="border px-4 py-3 text-left">Descrição</th>
+                      <th className="border px-4 py-3 text-left">Vencimento</th>
+                      <th className="border px-4 py-3 text-right">Valor Total</th>
+                      <th className="border px-4 py-3 text-right">Total Pago</th>
+                      <th className="border px-4 py-3 text-right">Saldo</th>
+                      <th className="border px-4 py-3 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getFilteredContas().map((conta, index) => (
+                      <tr key={conta.id} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-blue-50 transition-colors`}>
+                        <td className="border px-4 py-2 font-medium">{conta.empresa}</td>
+                        <td className="border px-4 py-2">{conta.descricao}</td>
+                        <td className="border px-4 py-2">
+                          {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                        </td>
+                        <td className="border px-4 py-2 text-right font-semibold">
+                          R$ {Number(conta.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="border px-4 py-2 text-right text-green-600 font-semibold">
+                          R$ {Number(conta.total_pago || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="border px-4 py-2 text-right text-orange-600 font-semibold">
+                          R$ {Number(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="border px-4 py-2 text-center">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            conta.status === 'Pago' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {conta.status || 'Pendente'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Totais resumidos na parte inferior */}
+              <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium">Total de registros: <strong>{resumoPeriodo.totalContas}</strong></span>
+                  <div className="flex gap-6">
+                    <span className="text-green-600 font-semibold">
+                      Pago: R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-orange-600 font-semibold">
+                      A Pagar: R$ {resumoPeriodo.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-blue-600 font-semibold">
+                      Total Geral: R$ {(resumoPeriodo.totalPago + resumoPeriodo.totalAPagar).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
