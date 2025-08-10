@@ -348,20 +348,6 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
                 <Filter className="h-4 w-4 mr-2" />
                 Calcular
               </Button>
-              <Button 
-                onClick={() => handleExportReport('pdf')}
-                className="bg-red-600 hover:bg-red-700 flex-1"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                PDF
-              </Button>
-              <Button 
-                onClick={() => handleExportReport('excel')}
-                className="bg-green-600 hover:bg-green-700 flex-1"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Excel
-              </Button>
             </div>
           </div>
         </CardContent>
@@ -468,111 +454,7 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
         </Card>
       )}
 
-      {/* Tipos de Relatórios */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {relatóriosDisponiveis.map((relatorio) => {
-          const Icon = relatorio.icon;
-          return (
-            <Card key={relatorio.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Icon className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <CardTitle>{relatorio.nome}</CardTitle>
-                    <p className="text-sm text-gray-600">{relatorio.descricao}</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleExportReport('pdf')}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    PDF
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleExportReport('excel')}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    Excel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
 
-      {/* Preview do Relatório */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Visualizar Dados do Relatório</CardTitle>
-          <p className="text-sm text-gray-600">
-            {getFilteredContas().length} registros encontrados
-          </p>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600">Carregando dados...</p>
-            </div>
-          ) : getFilteredContas().length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Nenhuma conta encontrada para os filtros aplicados</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Descrição</th>
-                    <th className="text-left p-2">Vencimento</th>
-                    <th className="text-right p-2">Valor Total</th>
-                    <th className="text-right p-2">Saldo</th>
-                    <th className="text-center p-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getFilteredContas().slice(0, 10).map((conta) => (
-                    <tr key={conta.id} className="border-b hover:bg-gray-50">
-                      <td className="p-2">{conta.descricao}</td>
-                      <td className="p-2">
-                        {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                      </td>
-                      <td className="p-2 text-right">
-                        R$ {(conta.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="p-2 text-right">
-                        R$ {(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="p-2 text-center">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          conta.status === 'Pago' 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-orange-100 text-orange-700'
-                        }`}>
-                          {conta.status || 'Pendente'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {getFilteredContas().length > 10 && (
-                <p className="text-sm text-gray-500 mt-2 text-center">
-                  ... e mais {getFilteredContas().length - 10} registros
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 };
