@@ -12,8 +12,10 @@ import {
   Filter,
   BarChart3,
   PieChart,
-  TrendingUp
+  TrendingUp,
+  Pencil
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
@@ -43,6 +45,12 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
     totalAPagar: 0,
     totalContas: 0
   });
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingConta, setEditingConta] = useState<ContaView | null>(null);
+  const [editDescricao, setEditDescricao] = useState("");
+  const [editVencimento, setEditVencimento] = useState("");
+  const [editValorTotal, setEditValorTotal] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadRelatoriosData = async () => {
     try {
@@ -243,6 +251,56 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
     link.click();
   };
 
+  const openEdit = (conta: ContaView) => {
+    setEditingConta(conta);
+    setEditDescricao(conta.descricao || "");
+    setEditVencimento(conta.vencimento || "");
+    setEditValorTotal(String(conta.valor_total ?? ""));
+    setEditOpen(true);
+  };
+
+  const handleUpdateConta = async () => {
+    if (!editingConta) return;
+    if (!editDescricao || !editVencimento || !editValorTotal) {
+      toast.error("Preencha descrição, vencimento e valor.");
+      return;
+    }
+
+    const valor = Number(editValorTotal.toString().replace(',', '.'));
+    if (isNaN(valor)) {
+      toast.error("Valor inválido.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      const { error } = await supabase
+        .from('contas')
+        .update({
+          descricao: editDescricao,
+          vencimento: editVencimento,
+          valor_total: valor,
+        })
+        .eq('id', editingConta.id as string);
+
+      if (error) {
+        console.error(error);
+        toast.error("Erro ao atualizar conta");
+        return;
+      }
+
+      toast.success("Conta atualizada");
+      await loadRelatoriosData();
+      calcularResumoPeriodo();
+      setEditOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro inesperado ao atualizar");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -398,6 +456,7 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
                       <th className="border px-4 py-3 text-right">Total Pago</th>
                       <th className="border px-4 py-3 text-right">Saldo</th>
                       <th className="border px-4 py-3 text-center">Status</th>
+                      <th className="border px-4 py-3 text-center">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -425,6 +484,12 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
                           }`}>
                             {conta.status || 'Pendente'}
                           </span>
+                        </td>
+                        <td className="border px-4 py-2 text-center">
+                          <Button variant="outline" size="sm" onClick={() => openEdit(conta)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Editar
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -454,6 +519,34 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
         </Card>
       )}
 
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Conta</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="descricao">Descrição</Label>
+              <Input id="descricao" value={editDescricao} onChange={(e) => setEditDescricao(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vencimento">Vencimento</Label>
+              <Input id="vencimento" type="date" value={editVencimento} onChange={(e) => setEditVencimento(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="valor">Valor Total</Label>
+              <Input id="valor" type="number" step="0.01" value={editValorTotal} onChange={(e) => setEditValorTotal(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button onClick={handleUpdateConta} disabled={savingEdit}>
+              {savingEdit ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
