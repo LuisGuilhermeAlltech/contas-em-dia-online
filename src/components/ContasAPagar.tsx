@@ -14,7 +14,8 @@ import {
   Filter, 
   MoreHorizontal, 
   DollarSign,
-  Trash2
+  Trash2,
+  Pencil
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +47,16 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   const [pagamentoData, setPagamentoData] = useState({
     valor: ""
   });
+
+  // Edição de conta
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [contaParaEditar, setContaParaEditar] = useState<ContaView | null>(null);
+  const [editForm, setEditForm] = useState({
+    descricao: "",
+    vencimento: "",
+    valorTotal: "",
+  });
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   // Carregar contas da view contas_view
   const loadContas = async () => {
@@ -269,6 +280,72 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     }
   };
 
+  // Edição
+  const abrirEdicao = (conta: ContaView) => {
+    setContaParaEditar(conta);
+    setEditForm({
+      descricao: conta.descricao || "",
+      vencimento: conta.vencimento || "",
+      valorTotal: String(conta.valor_total ?? ""),
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleAtualizarConta = async () => {
+    if (!contaParaEditar) return;
+
+    if (!editForm.descricao.trim() || !editForm.vencimento.trim() || !editForm.valorTotal.trim()) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const valor = parseFloat(editForm.valorTotal.replace(',', '.'));
+    if (isNaN(valor) || valor <= 0) {
+      toast({
+        title: "Valor inválido",
+        description: "Informe um valor maior que zero",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSalvandoEdicao(true);
+      const { error } = await supabase
+        .from('contas')
+        .update({
+          descricao: editForm.descricao.trim(),
+          vencimento: editForm.vencimento,
+          valor_total: valor,
+        })
+        .eq('id', contaParaEditar.id as string);
+
+      if (error) {
+        console.error("Erro ao atualizar:", error);
+        toast({
+          title: "Erro",
+          description: "Erro ao atualizar conta",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "Sucesso!", description: "Conta atualizada com sucesso" });
+      setIsEditDialogOpen(false);
+      setContaParaEditar(null);
+      await loadContas();
+    } catch (e) {
+      console.error("Erro inesperado:", e);
+      toast({ title: "Erro", description: "Erro inesperado ao atualizar", variant: "destructive" });
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Pago":
@@ -424,6 +501,63 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog de Edição */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Conta</DialogTitle>
+          </DialogHeader>
+          {contaParaEditar && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editDescricao">Descrição *</Label>
+                <Textarea 
+                  id="editDescricao" 
+                  value={editForm.descricao}
+                  onChange={(e) => setEditForm(prev => ({...prev, descricao: e.target.value}))}
+                  className="min-h-20"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editValor">Valor Total *</Label>
+                <Input 
+                  id="editValor" 
+                  type="number" 
+                  step="0.01"
+                  value={editForm.valorTotal}
+                  onChange={(e) => setEditForm(prev => ({...prev, valorTotal: e.target.value}))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="editVenc">Data de Vencimento *</Label>
+                <Input 
+                  id="editVenc" 
+                  type="date" 
+                  value={editForm.vencimento}
+                  onChange={(e) => setEditForm(prev => ({...prev, vencimento: e.target.value}))}
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleAtualizarConta}
+                  disabled={salvandoEdicao}
+                >
+                  {salvandoEdicao ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
@@ -514,6 +648,12 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                             Registrar Pagamento
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem 
+                          onClick={() => abrirEdicao(conta)}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
                         <DropdownMenuItem 
                           className="text-red-600"
                           onClick={() => handleDelete(conta.id!)}
