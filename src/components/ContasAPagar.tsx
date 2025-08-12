@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { 
   Plus, 
   Search, 
@@ -43,6 +44,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     valorTotal: "",
     vencimento: "",
   });
+  const [multiDatesEnabled, setMultiDatesEnabled] = useState(false);
+  const [vencimentosMultiplos, setVencimentosMultiplos] = useState<string[]>([""]);
 
   const [pagamentoData, setPagamentoData] = useState({
     valor: ""
@@ -104,15 +107,52 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
 
   const handleSave = async () => {
     console.log("=== SALVANDO CONTA NO SUPABASE ===");
-    console.log("Dados do formulário:", formData);
+    console.log("Dados do formulário:", formData, { multiDatesEnabled, vencimentosMultiplos });
     console.log("Empresa selecionada:", selectedEmpresa);
     
     try {
-      // Validação
-      if (!formData.descricao.trim() || !formData.valorTotal.trim() || !formData.vencimento.trim()) {
+      // Validação básica
+      if (!formData.descricao.trim() || !formData.valorTotal.trim()) {
         toast({
           title: "Campos obrigatórios",
           description: "Preencha todos os campos obrigatórios",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validar datas
+      if (!multiDatesEnabled && !formData.vencimento.trim()) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Informe a data de vencimento",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (multiDatesEnabled) {
+        const validDates = vencimentosMultiplos.map((d) => d?.trim()).filter(Boolean);
+        if (validDates.length === 0) {
+          toast({
+            title: "Datas inválidas",
+            description: "Adicione ao menos uma data de vencimento",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (validDates.some((d) => isNaN(Date.parse(d!)))) {
+          toast({
+            title: "Datas inválidas",
+            description: "Verifique as datas informadas",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else if (isNaN(Date.parse(formData.vencimento))) {
+        toast({
+          title: "Data inválida",
+          description: "Informe uma data de vencimento válida",
           variant: "destructive",
         });
         return;
@@ -128,32 +168,51 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         return;
       }
 
-      // Inserir no Supabase na tabela contas
-      const { data, error } = await supabase
-        .from('contas')
-        .insert({
-          descricao: formData.descricao.trim(),
-          empresa: selectedEmpresa,
-          valor_total: valorNumerico,
-          vencimento: formData.vencimento
-        })
-        .select()
-        .single();
+      const base = {
+        descricao: formData.descricao.trim(),
+        empresa: selectedEmpresa,
+        valor_total: valorNumerico,
+      } as const;
 
-      if (error) {
-        console.error("Erro do Supabase:", error);
+      const rows = multiDatesEnabled
+        ? vencimentosMultiplos
+            .map((d) => d.trim())
+            .filter(Boolean)
+            .slice(0, 5)
+            .map((d) => ({ ...base, vencimento: d }))
+        : [{ ...base, vencimento: formData.vencimento }];
+
+      if (rows.length === 0) {
         toast({
-          title: "Erro ao salvar",
-          description: "Erro ao salvar conta no banco de dados",
+          title: "Nada a salvar",
+          description: "Adicione ao menos uma data",
           variant: "destructive",
         });
         return;
       }
 
-      console.log("✅ Conta salva no Supabase:", data);
+      // Inserção em lote quando houver múltiplas datas
+      const { data, error } = await supabase
+        .from('contas')
+        .insert(rows)
+        .select();
+
+      if (error) {
+        console.error("Erro do Supabase:", error);
+        toast({
+          title: "Erro ao salvar",
+          description: "Erro ao salvar conta(s) no banco de dados",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("✅ Conta(s) salva(s) no Supabase:", data);
 
       // Limpar formulário e fechar dialog
       setFormData({ descricao: "", valorTotal: "", vencimento: "" });
+      setMultiDatesEnabled(false);
+      setVencimentosMultiplos([""]);
       setIsDialogOpen(false);
 
       // Recarregar lista da view
@@ -161,7 +220,9 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
 
       toast({
         title: "✅ Sucesso!",
-        description: `Conta "${data.descricao}" salva com sucesso`,
+        description: multiDatesEnabled
+          ? `${rows.length} contas salvas com sucesso`
+          : `Conta "${rows[0].descricao}" salva com sucesso`,
       });
 
     } catch (error) {
@@ -364,9 +425,11 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   });
 
   const isFormValid = Boolean(
-    formData.descricao?.trim() && 
-    formData.valorTotal?.trim() && 
-    formData.vencimento?.trim()
+    formData.descricao?.trim() &&
+    formData.valorTotal?.trim() &&
+    (multiDatesEnabled
+      ? vencimentosMultiplos.length > 0 && vencimentosMultiplos.every((d) => d && d.trim())
+      : formData.vencimento?.trim())
   );
 
   if (loading) {
@@ -382,7 +445,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-gray-900">Contas a Pagar</h2>
+        <h2 className="text-3xl font-bold">Contas a Pagar</h2>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
@@ -416,15 +479,68 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   onChange={(e) => setFormData(prev => ({...prev, valorTotal: e.target.value}))}
                 />
               </div>
-              <div>
-                <Label htmlFor="vencimento">Data de Vencimento *</Label>
-                <Input 
-                  id="vencimento" 
-                  type="date" 
-                  value={formData.vencimento}
-                  onChange={(e) => setFormData(prev => ({...prev, vencimento: e.target.value}))}
-                />
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Vencimento</Label>
+                  <p className="text-sm text-muted-foreground">Cadastre o mesmo valor em até 5 datas</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Múltiplas datas</span>
+                  <Switch checked={multiDatesEnabled} onCheckedChange={setMultiDatesEnabled} />
+                </div>
               </div>
+
+              {!multiDatesEnabled ? (
+                <div>
+                  <Label htmlFor="vencimento">Data de Vencimento *</Label>
+                  <Input 
+                    id="vencimento" 
+                    type="date" 
+                    value={formData.vencimento}
+                    onChange={(e) => setFormData(prev => ({...prev, vencimento: e.target.value}))}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Label>Datas de Vencimento *</Label>
+                  {vencimentosMultiplos.map((d, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <Input
+                        type="date"
+                        value={d}
+                        onChange={(e) => {
+                          const next = [...vencimentosMultiplos];
+                          next[idx] = e.target.value;
+                          setVencimentosMultiplos(next);
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const next = vencimentosMultiplos.filter((_, i) => i !== idx);
+                          setVencimentosMultiplos(next.length ? next : [""]);
+                        }}
+                        aria-label="Remover data"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{vencimentosMultiplos.length}/5</span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setVencimentosMultiplos((prev) => (prev.length < 5 ? [...prev, ""] : prev))}
+                      disabled={vencimentosMultiplos.length >= 5}
+                    >
+                      Adicionar data
+                    </Button>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2 pt-4">
                 <Button 
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
@@ -439,6 +555,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   onClick={() => {
                     setIsDialogOpen(false);
                     setFormData({ descricao: "", valorTotal: "", vencimento: "" });
+                    setMultiDatesEnabled(false);
+                    setVencimentosMultiplos([""]);
                   }}
                 >
                   Cancelar
