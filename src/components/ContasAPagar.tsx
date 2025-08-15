@@ -16,7 +16,8 @@ import {
   MoreHorizontal, 
   DollarSign,
   Trash2,
-  Pencil
+  Pencil,
+  Check
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -336,6 +337,48 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       toast({
         title: "Erro",
         description: "Erro inesperado ao excluir conta",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Marcar como paga
+  const handleMarcarComoPaga = async (conta: ContaView) => {
+    if (!conta.saldo || conta.saldo <= 0) return;
+
+    try {
+      // Inserir pagamento com o valor do saldo restante
+      const { error: pagamentoError } = await supabase
+        .from('pagamentos')
+        .insert({
+          conta_id: conta.id!,
+          valor: conta.saldo,
+          data: new Date().toISOString().split('T')[0]
+        });
+
+      if (pagamentoError) {
+        console.error("Erro ao marcar como paga:", pagamentoError);
+        toast({
+          title: "Erro",
+          description: "Erro ao marcar conta como paga",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Recarregar lista
+      await loadContas();
+
+      toast({
+        title: "Sucesso!",
+        description: "Conta marcada como paga com sucesso",
+      });
+
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao marcar como paga",
         variant: "destructive",
       });
     }
@@ -754,7 +797,15 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent>
+                       <DropdownMenuContent>
+                        {conta.status !== "Pago" && conta.saldo && conta.saldo > 0 && (
+                          <DropdownMenuItem 
+                            onClick={() => handleMarcarComoPaga(conta)}
+                          >
+                            <Check className="h-4 w-4 mr-2" />
+                            Marcar como Paga
+                          </DropdownMenuItem>
+                        )}
                         {conta.status !== "Pago" && (
                           <DropdownMenuItem 
                             onClick={() => {
