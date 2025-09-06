@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   const [contaParaPagamento, setContaParaPagamento] = useState<ContaView | null>(null);
   const [contas, setContas] = useState<ContaView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const [formData, setFormData] = useState({
     descricao: "",
@@ -99,14 +101,20 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     }
   };
 
+  // Memoizar loadContas para evitar re-renders
+  const memoizedLoadContas = useCallback(loadContas, [selectedEmpresa]);
+
   // Carregar contas quando a empresa mudar
   useEffect(() => {
     if (selectedEmpresa) {
-      loadContas();
+      memoizedLoadContas();
     }
-  }, [selectedEmpresa]);
+  }, [selectedEmpresa, memoizedLoadContas]);
 
   const handleSave = async () => {
+    if (isSaving) return; // Previne cliques duplos
+    
+    setIsSaving(true);
     console.log("=== SALVANDO CONTA NO SUPABASE ===");
     console.log("Dados do formulário:", formData, { multiDatesEnabled, vencimentosMultiplos });
     console.log("Empresa selecionada:", selectedEmpresa);
@@ -216,8 +224,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       setVencimentosMultiplos([""]);
       setIsDialogOpen(false);
 
-      // Recarregar lista da view
-      await loadContas();
+      // Recarregar lista da view (debounced)
+      setTimeout(() => loadContas(), 100);
 
       toast({
         title: "✅ Sucesso!",
@@ -233,20 +241,25 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         description: "Ocorreu um erro ao salvar a conta",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handlePagamento = async () => {
-    if (!contaParaPagamento || !pagamentoData.valor) {
-      toast({
-        title: "Erro",
-        description: "Informe o valor do pagamento",
-        variant: "destructive",
-      });
+    if (isProcessing || !contaParaPagamento || !pagamentoData.valor) {
+      if (!contaParaPagamento || !pagamentoData.valor) {
+        toast({
+          title: "Erro",
+          description: "Informe o valor do pagamento",
+          variant: "destructive",
+        });
+      }
       return;
     }
 
     try {
+      setIsProcessing(true);
       const valorPagamento = parseFloat(pagamentoData.valor.replace(',', '.'));
       if (isNaN(valorPagamento) || valorPagamento <= 0) {
         toast({
@@ -305,6 +318,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         description: "Erro inesperado ao registrar pagamento",
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -366,8 +381,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         return;
       }
 
-      // Recarregar lista
-      await loadContas();
+      // Recarregar lista (debounced)  
+      setTimeout(() => loadContas(), 100);
 
       toast({
         title: "Sucesso!",
@@ -588,9 +603,9 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                 <Button 
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
                   onClick={handleSave}
-                  disabled={!isFormValid}
+                  disabled={!isFormValid || isSaving}
                 >
-                  Salvar
+                  {isSaving ? "Salvando..." : "Salvar"}
                 </Button>
                 <Button 
                   variant="outline" 
