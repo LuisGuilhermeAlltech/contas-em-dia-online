@@ -17,7 +17,8 @@ import {
   DollarSign,
   Trash2,
   Pencil,
-  Check
+  Check,
+  Eye
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,9 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPagamentoDialogOpen, setIsPagamentoDialogOpen] = useState(false);
   const [contaParaPagamento, setContaParaPagamento] = useState<ContaView | null>(null);
+  const [isHistoricoDialogOpen, setIsHistoricoDialogOpen] = useState(false);
+  const [contaParaHistorico, setContaParaHistorico] = useState<ContaView | null>(null);
+  const [historicoPagamentos, setHistoricoPagamentos] = useState<any[]>([]);
   const [contas, setContas] = useState<ContaView[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -352,6 +356,38 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       toast({
         title: "Erro",
         description: "Erro inesperado ao excluir conta",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Ver histórico de pagamentos
+  const handleVerHistorico = async (conta: ContaView) => {
+    try {
+      const { data: pagamentos, error } = await supabase
+        .from('pagamentos')
+        .select('*')
+        .eq('conta_id', conta.id!)
+        .order('data', { ascending: false });
+
+      if (error) {
+        console.error("Erro ao carregar histórico:", error);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar histórico de pagamentos",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setHistoricoPagamentos(pagamentos || []);
+      setContaParaHistorico(conta);
+      setIsHistoricoDialogOpen(true);
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao carregar histórico",
         variant: "destructive",
       });
     }
@@ -734,6 +770,67 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog de Histórico de Pagamentos */}
+      <Dialog open={isHistoricoDialogOpen} onOpenChange={setIsHistoricoDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Histórico de Pagamentos</DialogTitle>
+          </DialogHeader>
+          {contaParaHistorico && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h3 className="font-medium text-gray-900">{contaParaHistorico.descricao}</h3>
+                <p className="text-sm text-gray-600">
+                  Valor Total: R$ {(contaParaHistorico.valor_total || 0).toFixed(2)}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Total Pago: R$ {(contaParaHistorico.total_pago || 0).toFixed(2)}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Saldo Restante: R$ {(contaParaHistorico.saldo || 0).toFixed(2)}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-900">Pagamentos Realizados:</h4>
+                {historicoPagamentos.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">Nenhum pagamento registrado</p>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {historicoPagamentos.map((pagamento, index) => (
+                      <div key={pagamento.id} className="flex justify-between items-center p-3 border rounded-lg bg-white">
+                        <div>
+                          <p className="text-sm font-medium">
+                            Pagamento #{historicoPagamentos.length - index}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(pagamento.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-green-600">
+                            + R$ {parseFloat(pagamento.valor).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsHistoricoDialogOpen(false)}
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
@@ -812,7 +909,15 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                       <DropdownMenuContent>
+                        <DropdownMenuContent>
+                        {conta.status === "Parcial" && (
+                          <DropdownMenuItem 
+                            onClick={() => handleVerHistorico(conta)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Histórico de Pagamentos
+                          </DropdownMenuItem>
+                        )}
                         {conta.status !== "Pago" && conta.saldo && conta.saldo > 0 && (
                           <DropdownMenuItem 
                             onClick={() => handleMarcarComoPaga(conta)}
