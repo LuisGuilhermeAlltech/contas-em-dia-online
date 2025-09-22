@@ -152,15 +152,19 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
   ];
 
   const getFilteredContas = () => {
+    if (!contas || contas.length === 0) {
+      return [];
+    }
+    
     let filteredContas = [...contas];
 
     // Filtrar por tipo de relatório
     switch (tipoRelatorio) {
       case "contas-pagas":
-        filteredContas = filteredContas.filter(conta => conta.status === 'Pago');
+        filteredContas = filteredContas.filter(conta => conta && conta.status === 'Pago');
         break;
       case "contas-pendentes":
-        filteredContas = filteredContas.filter(conta => conta.status !== 'Pago');
+        filteredContas = filteredContas.filter(conta => conta && conta.status !== 'Pago');
         break;
     }
 
@@ -170,14 +174,20 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
       const fim = new Date(periodoFim + 'T23:59:59');
       
       filteredContas = filteredContas.filter(conta => {
-        if (!conta.vencimento) return false;
-        const vencimento = new Date(conta.vencimento + 'T00:00:00');
-        return vencimento >= inicio && vencimento <= fim;
+        if (!conta || !conta.vencimento) return false;
+        try {
+          const vencimento = new Date(conta.vencimento + 'T00:00:00');
+          return vencimento >= inicio && vencimento <= fim;
+        } catch (error) {
+          console.error('Erro ao processar data de vencimento:', conta.vencimento, error);
+          return false;
+        }
       });
     }
 
     // Ordenar por data de vencimento em ordem crescente
     filteredContas.sort((a, b) => {
+      if (!a || !b) return 0;
       const aDate = a.vencimento ? new Date(a.vencimento + 'T00:00:00').getTime() : Infinity;
       const bDate = b.vencimento ? new Date(b.vencimento + 'T00:00:00').getTime() : Infinity;
       return aDate - bDate;
@@ -474,39 +484,47 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {getFilteredContas().map((conta, index) => (
-                      <tr key={conta.id} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-blue-50 transition-colors`}>
-                        <td className="border px-4 py-2 font-medium">{conta.empresa}</td>
-                        <td className="border px-4 py-2">{conta.descricao}</td>
-                        <td className="border px-4 py-2">
-                          {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                        </td>
-                        <td className="border px-4 py-2 text-right font-semibold">
-                          R$ {Number(conta.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="border px-4 py-2 text-right text-green-600 font-semibold">
-                          R$ {Number(conta.total_pago || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="border px-4 py-2 text-right text-orange-600 font-semibold">
-                          R$ {Number(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="border px-4 py-2 text-center">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            conta.status === 'Pago' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-orange-100 text-orange-800'
-                          }`}>
-                            {conta.status || 'Pendente'}
-                          </span>
-                        </td>
-                        <td className="border px-4 py-2 text-center">
-                          <Button variant="outline" size="sm" onClick={() => openEdit(conta)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Editar
-                          </Button>
+                    {getFilteredContas().length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="border px-4 py-8 text-center text-gray-500">
+                          Nenhuma conta encontrada para o filtro selecionado.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      getFilteredContas().map((conta, index) => (
+                        <tr key={conta?.id || index} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-blue-50 transition-colors`}>
+                          <td className="border px-4 py-2 font-medium">{conta?.empresa || '-'}</td>
+                          <td className="border px-4 py-2">{conta?.descricao || '-'}</td>
+                          <td className="border px-4 py-2">
+                            {conta?.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                          </td>
+                          <td className="border px-4 py-2 text-right font-semibold">
+                            R$ {Number(conta?.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="border px-4 py-2 text-right text-green-600 font-semibold">
+                            R$ {Number(conta?.total_pago || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="border px-4 py-2 text-right text-orange-600 font-semibold">
+                            R$ {Number(conta?.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="border px-4 py-2 text-center">
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              conta?.status === 'Pago' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-orange-100 text-orange-800'
+                            }`}>
+                              {conta?.status || 'Pendente'}
+                            </span>
+                          </td>
+                          <td className="border px-4 py-2 text-center">
+                            <Button variant="outline" size="sm" onClick={() => conta && openEdit(conta)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Editar
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
