@@ -411,40 +411,54 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
         </CardContent>
       </Card>
 
-      {/* Resumo do Período Selecionado */}
-      {(periodoInicio && periodoFim && resumoPeriodo.totalContas > 0) && (
+      {/* Resumo e Tabela de Contas */}
+      {((periodoInicio && periodoFim && resumoPeriodo.totalContas > 0) || (!periodoInicio && !periodoFim)) && (
         <Card className="border-2 border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-700">Resumo do Período Selecionado</CardTitle>
-            <p className="text-sm text-blue-600">
-              {new Date(periodoInicio + 'T00:00:00').toLocaleDateString('pt-BR')} até {new Date(periodoFim + 'T00:00:00').toLocaleDateString('pt-BR')}
-            </p>
+            <CardTitle className="text-blue-700">
+              {periodoInicio && periodoFim ? 'Resumo do Período Selecionado' : `Relatório de ${relatóriosDisponiveis.find(r => r.id === tipoRelatorio)?.nome || 'Contas'}`}
+            </CardTitle>
+            {periodoInicio && periodoFim && (
+              <p className="text-sm text-blue-600">
+                {new Date(periodoInicio + 'T00:00:00').toLocaleDateString('pt-BR')} até {new Date(periodoFim + 'T00:00:00').toLocaleDateString('pt-BR')}
+              </p>
+            )}
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {(periodoInicio && periodoFim) ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
+                  <p className="text-sm text-gray-600">Total Pago</p>
                 </div>
-                <p className="text-sm text-gray-600">Total Pago</p>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  R$ {resumoPeriodo.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    R$ {resumoPeriodo.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
+                  <p className="text-sm text-gray-600">Total a Pagar</p>
                 </div>
-                <p className="text-sm text-gray-600">Total a Pagar</p>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {resumoPeriodo.totalContas}
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {resumoPeriodo.totalContas}
+                  </div>
+                  <p className="text-sm text-gray-600">Total de Contas</p>
                 </div>
-                <p className="text-sm text-gray-600">Total de Contas</p>
               </div>
-            </div>
+            ) : (
+              <div className="mb-6">
+                <p className="text-lg text-gray-700">
+                  Exibindo {getFilteredContas().length} contas do tipo "{relatóriosDisponiveis.find(r => r.id === tipoRelatorio)?.nome}"
+                </p>
+              </div>
+            )}
             
-            {/* Tabela detalhada de todas as contas do período */}
+            {/* Tabela detalhada de todas as contas */}
             <div className="mt-6">
-              <h4 className="text-lg font-semibold mb-3 text-blue-700">Detalhes das Contas do Período</h4>
+              <h4 className="text-lg font-semibold mb-3 text-blue-700">
+                {periodoInicio && periodoFim ? 'Detalhes das Contas do Período' : 'Lista de Contas'}
+              </h4>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse bg-white rounded-lg overflow-hidden shadow">
                   <thead>
@@ -500,18 +514,20 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
               {/* Totais resumidos na parte inferior */}
               <div className="mt-4 p-4 bg-gray-100 rounded-lg">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="font-medium">Total de registros: <strong>{resumoPeriodo.totalContas}</strong></span>
-                  <div className="flex gap-6">
-                    <span className="text-green-600 font-semibold">
-                      Pago: R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-orange-600 font-semibold">
-                      A Pagar: R$ {resumoPeriodo.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-blue-600 font-semibold">
-                      Total Geral: R$ {(resumoPeriodo.totalPago + resumoPeriodo.totalAPagar).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
+                  <span className="font-medium">Total de registros: <strong>{getFilteredContas().length}</strong></span>
+                  {periodoInicio && periodoFim && (
+                    <div className="flex gap-6">
+                      <span className="text-green-600 font-semibold">
+                        Pago: R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-orange-600 font-semibold">
+                        A Pagar: R$ {resumoPeriodo.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-blue-600 font-semibold">
+                        Total Geral: R$ {(resumoPeriodo.totalPago + resumoPeriodo.totalAPagar).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
