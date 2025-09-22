@@ -443,13 +443,43 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     }
   };
 
-  const filteredContas = contas.filter(conta => {
-    if (!conta) return false;
+  const filteredContas = useCallback(() => {
+    if (!Array.isArray(contas)) return [];
     
-    const matchSearch = (conta.descricao || '').toLowerCase().includes((searchTerm || '').toLowerCase());
-    const matchStatus = statusFilter === "all" || (conta.status || '').toLowerCase() === statusFilter.toLowerCase();
-    return matchSearch && matchStatus;
-  });
+    return contas.filter(conta => {
+      try {
+        if (!conta || !conta.id) return false;
+        
+        // Filtro de busca por descrição
+        const searchLower = (searchTerm || '').toLowerCase().trim();
+        const descricao = (conta.descricao || '').toLowerCase();
+        const matchSearch = !searchLower || descricao.includes(searchLower);
+        
+        // Filtro de status - tratamento mais robusto
+        if (statusFilter === "all") {
+          return matchSearch;
+        }
+        
+        const statusConta = (conta.status || 'pendente').toLowerCase().trim();
+        const statusFiltro = statusFilter.toLowerCase().trim();
+        
+        // Mapeamento mais flexível de status
+        const statusMap: Record<string, string[]> = {
+          'pendente': ['pendente', 'pending', ''],
+          'parcial': ['parcial', 'partial'],
+          'pago': ['pago', 'paid', 'completo', 'complete']
+        };
+        
+        const statusPermitidos = statusMap[statusFiltro] || [statusFiltro];
+        const matchStatus = statusPermitidos.includes(statusConta);
+        
+        return matchSearch && matchStatus;
+      } catch (error) {
+        console.error('Erro ao filtrar conta:', error, conta);
+        return false;
+      }
+    });
+  }, [contas, searchTerm, statusFilter]);
 
   const isFormValid = Boolean(
     formData.descricao?.trim() &&
@@ -787,7 +817,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
           <CardTitle>Lista de Contas</CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredContas.length === 0 ? (
+          {filteredContas().length === 0 ? (
             <div className="text-center py-8">
               <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">
@@ -798,7 +828,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredContas.map((conta) => {
+              {filteredContas().map((conta) => {
                 if (!conta || !conta.id) return null;
                 return (
                   <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
