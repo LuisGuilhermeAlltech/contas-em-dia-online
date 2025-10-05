@@ -426,27 +426,25 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Pago":
-        return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Pago</Badge>;
-      case "Parcial":
-        return <Badge variant="outline" className="border-blue-500 text-blue-700">Parcial</Badge>;
-      default:
-        return <Badge variant="secondary">Pendente</Badge>;
+    const statusLower = String(status || 'Pendente').toLowerCase();
+    
+    if (statusLower === 'pago') {
+      return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Pago</Badge>;
+    } else if (statusLower === 'parcial') {
+      return <Badge variant="outline" className="border-blue-500 text-blue-700">Parcial</Badge>;
+    } else {
+      return <Badge variant="secondary">Pendente</Badge>;
     }
   };
 
   const filteredContas = useMemo(() => {
     try {
-      // Não filtrar se ainda estiver carregando
-      if (loading) {
-        return [];
-      }
-
       if (!Array.isArray(contas)) {
         console.warn('Contas não é um array:', contas);
         return [];
       }
+      
+      console.log('Filtrando contas. Total:', contas.length, 'Status:', statusFilter, 'Busca:', searchTerm);
       
       return contas.filter(conta => {
         try {
@@ -465,20 +463,13 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             return matchSearch;
           }
           
-          // Filtro de status - normalizar ambos
+          // Filtro de status - normalizar ambos para lowercase
           const statusConta = String(conta.status || 'Pendente').toLowerCase().trim();
           const statusFiltro = String(statusFilter).toLowerCase().trim();
           
-          // Match exato ou variantes
-          let matchStatus = false;
+          const matchStatus = statusConta === statusFiltro;
           
-          if (statusFiltro === 'pago') {
-            matchStatus = statusConta === 'pago';
-          } else if (statusFiltro === 'parcial') {
-            matchStatus = statusConta === 'parcial';
-          } else if (statusFiltro === 'pendente') {
-            matchStatus = statusConta === 'pendente';
-          }
+          console.log('Conta:', conta.descricao, 'Status DB:', statusConta, 'Filtro:', statusFiltro, 'Match:', matchStatus);
           
           return matchSearch && matchStatus;
         } catch (innerError) {
@@ -490,7 +481,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       console.error('Erro crítico em filteredContas:', error);
       return [];
     }
-  }, [contas, searchTerm, statusFilter, loading]);
+  }, [contas, searchTerm, statusFilter]);
 
   const isFormValid = Boolean(
     formData.descricao?.trim() &&
@@ -804,26 +795,15 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
           <Input
             placeholder="Buscar por descrição..."
             value={searchTerm}
-            onChange={(e) => {
-              try {
-                setSearchTerm(e.target.value);
-              } catch (error) {
-                console.error('Erro ao atualizar busca:', error);
-              }
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
+            disabled={loading}
           />
         </div>
         <Select 
           value={statusFilter} 
-          onValueChange={(value) => {
-            try {
-              console.log('Mudando filtro para:', value);
-              setStatusFilter(value);
-            } catch (error) {
-              console.error('Erro ao mudar filtro:', error);
-            }
-          }}
+          onValueChange={setStatusFilter}
+          disabled={loading}
         >
           <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
@@ -857,87 +837,91 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             <div className="space-y-4">
               {filteredContas.map((conta) => {
                 try {
-                  if (!conta || !conta.id) return null;
-                return (
-                  <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{conta.descricao || 'Sem descrição'}</h3>
-                      <p className="text-sm text-gray-600">
-                        Vencimento: {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                      </p>
-                      {conta.status === "Parcial" && (
-                        <p className="text-xs text-blue-600">
-                          Pago: R$ {(conta.total_pago || 0).toFixed(2)} | Saldo: R$ {(conta.saldo || 0).toFixed(2)}
+                  if (!conta || !conta.id) {
+                    console.warn('Conta inválida encontrada:', conta);
+                    return null;
+                  }
+                  
+                  return (
+                    <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900">{conta.descricao || 'Sem descrição'}</h3>
+                        <p className="text-sm text-gray-600">
+                          Vencimento: {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                         </p>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-bold text-lg text-gray-900">
-                          R$ {(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Total: R$ {(conta.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
+                        {conta.status === "Parcial" && (
+                          <p className="text-xs text-blue-600">
+                            Pago: R$ {(conta.total_pago || 0).toFixed(2)} | Saldo: R$ {(conta.saldo || 0).toFixed(2)}
+                          </p>
+                        )}
                       </div>
                       
-                      {getStatusBadge(conta.status || 'Pendente')}
-                      
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          {conta.status === "Parcial" && (
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-gray-900">
+                            R$ {(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Total: R$ {(conta.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        
+                        {getStatusBadge(conta.status || 'Pendente')}
+                        
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            {conta.status === "Parcial" && (
+                              <DropdownMenuItem 
+                                onClick={() => handleVerHistorico(conta)}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Ver Histórico de Pagamentos
+                              </DropdownMenuItem>
+                            )}
+                            {conta.status !== "Pago" && conta.saldo && conta.saldo > 0 && (
+                              <DropdownMenuItem 
+                                onClick={() => handleMarcarComoPaga(conta)}
+                              >
+                                <Check className="h-4 w-4 mr-2" />
+                                Marcar como Paga
+                              </DropdownMenuItem>
+                            )}
+                            {conta.status !== "Pago" && (
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setContaParaPagamento(conta);
+                                  setIsPagamentoDialogOpen(true);
+                                }}
+                              >
+                                <DollarSign className="h-4 w-4 mr-2" />
+                                Registrar Pagamento
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem 
-                              onClick={() => handleVerHistorico(conta)}
+                              onClick={() => abrirEdicao(conta)}
                             >
-                              <Eye className="h-4 w-4 mr-2" />
-                              Ver Histórico de Pagamentos
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Editar
                             </DropdownMenuItem>
-                          )}
-                          {conta.status !== "Pago" && conta.saldo && conta.saldo > 0 && (
                             <DropdownMenuItem 
-                              onClick={() => handleMarcarComoPaga(conta)}
+                              className="text-red-600"
+                              onClick={() => handleDelete(conta.id!)}
                             >
-                              <Check className="h-4 w-4 mr-2" />
-                              Marcar como Paga
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir
                             </DropdownMenuItem>
-                          )}
-                          {conta.status !== "Pago" && (
-                            <DropdownMenuItem 
-                              onClick={() => {
-                                setContaParaPagamento(conta);
-                                setIsPagamentoDialogOpen(true);
-                              }}
-                            >
-                              <DollarSign className="h-4 w-4 mr-2" />
-                              Registrar Pagamento
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem 
-                            onClick={() => abrirEdicao(conta)}
-                          >
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={() => handleDelete(conta.id!)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
-                  </div>
-                );
-                } catch (renderError) {
-                  console.error('Erro ao renderizar conta:', renderError, conta);
+                  );
+                } catch (error) {
+                  console.error('Erro ao renderizar conta:', error, conta);
                   return null;
                 }
               })}
