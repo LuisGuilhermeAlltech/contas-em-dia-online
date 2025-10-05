@@ -82,11 +82,6 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
 
       if (error) {
         console.error("Erro ao carregar contas:", error);
-        toast({
-          title: "Erro",
-          description: "Erro ao carregar contas do banco de dados",
-          variant: "destructive",
-        });
         return;
       }
 
@@ -94,15 +89,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       console.log("Contas carregadas da view:", contasData);
     } catch (error) {
       console.error("Erro inesperado:", error);
-      toast({
-        title: "Erro",
-        description: "Erro inesperado ao carregar dados",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
-  }, [selectedEmpresa, toast]);
+  }, [selectedEmpresa]);
 
   useEffect(() => {
     if (selectedEmpresa) {
@@ -190,10 +180,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       setMultiDatesEnabled(false);
       setIsDialogOpen(false);
       
-      // Aguardar um pouco antes de recarregar para dar tempo da inserção ser processada
-      setTimeout(() => {
-        loadContas();
-      }, 500);
+      // Recarregar contas
+      loadContas();
     } catch (error) {
       console.error("Erro completo:", error);
       toast({
@@ -277,10 +265,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       setIsPagamentoDialogOpen(false);
       setContaParaPagamento(null);
       
-      // Aguardar um pouco antes de recarregar
-      setTimeout(() => {
-        loadContas();
-      }, 500);
+      // Recarregar contas
+      loadContas();
     } catch (error) {
       console.error("Erro ao registrar pagamento:", error);
       toast({
@@ -323,10 +309,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         description: "Conta marcada como paga",
       });
       
-      // Aguardar um pouco antes de recarregar
-      setTimeout(() => {
-        loadContas();
-      }, 500);
+      // Recarregar contas
+      loadContas();
     } catch (error) {
       console.error("Erro ao marcar como paga:", error);
       toast({
@@ -416,10 +400,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       setIsEditDialogOpen(false);
       setContaParaEditar(null);
       
-      // Aguardar um pouco antes de recarregar
-      setTimeout(() => {
-        loadContas();
-      }, 500);
+      // Recarregar contas
+      loadContas();
     } catch (error) {
       console.error("Erro ao atualizar conta:", error);
       toast({
