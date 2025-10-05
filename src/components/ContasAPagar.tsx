@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { useContas } from "./contas/useContas";
 import { ContaCard } from "./contas/ContaCard";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 
 interface ContasAPagarProps {
   selectedEmpresa: string;
@@ -556,8 +557,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             <div className="space-y-4">
               <div>
                 <p><strong>Conta:</strong> {contaParaPagamento.descricao}</p>
-                <p><strong>Valor Total:</strong> R$ {Number(contaParaPagamento.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                <p><strong>Saldo Restante:</strong> R$ {Number(contaParaPagamento.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p><strong>Valor Total:</strong> R$ {formatCurrency(contaParaPagamento.valor_total)}</p>
+                <p><strong>Saldo Restante:</strong> R$ {formatCurrency(contaParaPagamento.saldo)}</p>
               </div>
               <div>
                 <Label htmlFor="valor-pagamento">Valor do Pagamento</Label>
@@ -605,15 +606,15 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                 <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
                   <div>
                     <span className="text-gray-600">Valor Total:</span>
-                    <span className="ml-2 font-semibold">R$ {Number(contaParaHistorico.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="ml-2 font-semibold">R$ {formatCurrency(contaParaHistorico.valor_total)}</span>
                   </div>
                   <div>
                     <span className="text-gray-600">Total Pago:</span>
-                    <span className="ml-2 font-semibold text-green-600">R$ {Number(contaParaHistorico.total_pago || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="ml-2 font-semibold text-green-600">R$ {formatCurrency(contaParaHistorico.total_pago)}</span>
                   </div>
                   <div>
                     <span className="text-gray-600">Saldo Restante:</span>
-                    <span className="ml-2 font-semibold text-orange-600">R$ {Number(contaParaHistorico.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="ml-2 font-semibold text-orange-600">R$ {formatCurrency(contaParaHistorico.saldo)}</span>
                   </div>
                   <div>
                     <span className="text-gray-600">Status:</span>
@@ -632,11 +633,11 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                       <div key={pagamento.id || index} className="flex justify-between items-center p-3 bg-white border rounded">
                         <div>
                           <span className="text-sm text-gray-600">
-                            {new Date(pagamento.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            {formatDate(pagamento.data)}
                           </span>
                         </div>
                         <div className="font-semibold text-green-600">
-                          R$ {Number(pagamento.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {formatCurrency(pagamento.valor)}
                         </div>
                       </div>
                     ))

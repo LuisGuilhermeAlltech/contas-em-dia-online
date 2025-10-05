@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, DollarSign, Check, Eye, Pencil, Trash2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 
 type ContaView = Tables<'contas_view'>;
 
@@ -42,11 +43,11 @@ export const ContaCard = ({
       <div className="flex-1">
         <h3 className="font-medium text-gray-900">{conta.descricao || 'Sem descrição'}</h3>
         <p className="text-sm text-gray-600">
-          Vencimento: {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+          Vencimento: {formatDate(conta.vencimento)}
         </p>
         {statusLower === "parcial" && (
           <p className="text-xs text-blue-600">
-            Pago: R$ {(conta.total_pago || 0).toFixed(2)} | Saldo: R$ {(conta.saldo || 0).toFixed(2)}
+            Pago: R$ {formatCurrency(conta.total_pago)} | Saldo: R$ {formatCurrency(conta.saldo)}
           </p>
         )}
       </div>
@@ -54,10 +55,10 @@ export const ContaCard = ({
       <div className="flex items-center gap-4">
         <div className="text-right">
           <p className="font-bold text-lg text-gray-900">
-            R$ {(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            R$ {formatCurrency(conta.saldo)}
           </p>
           <p className="text-xs text-gray-500">
-            Total: R$ {(conta.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            Total: R$ {formatCurrency(conta.valor_total)}
           </p>
         </div>
         
