@@ -7,6 +7,7 @@ import { Fornecedores } from "@/components/Fornecedores";
 import { Relatorios } from "@/components/Relatorios";
 import { OfflineInstaller } from "@/components/OfflineInstaller";
 import { OfflineStatus } from "@/components/OfflineStatus";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { Menu, Download } from "lucide-react";
 
@@ -16,19 +17,30 @@ const Index = () => {
   const [selectedEmpresa, setSelectedEmpresa] = useState("grupo-lider");
 
   const renderContent = () => {
-    switch (activeMenu) {
-      case "dashboard":
-        return <Dashboard selectedEmpresa={selectedEmpresa} />;
-      case "contas":
-        return <ContasAPagar selectedEmpresa={selectedEmpresa} />;
-      case "fornecedores":
-        return <Fornecedores selectedEmpresa={selectedEmpresa} />;
-      case "relatorios":
-        return <Relatorios selectedEmpresa={selectedEmpresa} />;
-      case "instalador":
-        return <OfflineInstaller />;
-      default:
-        return <Dashboard selectedEmpresa={selectedEmpresa} />;
+    console.log('Renderizando conteúdo para menu:', activeMenu);
+    
+    try {
+      switch (activeMenu) {
+        case "dashboard":
+          return <Dashboard selectedEmpresa={selectedEmpresa} />;
+        case "contas":
+          return (
+            <ErrorBoundary>
+              <ContasAPagar selectedEmpresa={selectedEmpresa} />
+            </ErrorBoundary>
+          );
+        case "fornecedores":
+          return <Fornecedores selectedEmpresa={selectedEmpresa} />;
+        case "relatorios":
+          return <Relatorios selectedEmpresa={selectedEmpresa} />;
+        case "instalador":
+          return <OfflineInstaller />;
+        default:
+          return <Dashboard selectedEmpresa={selectedEmpresa} />;
+      }
+    } catch (error) {
+      console.error('Erro ao renderizar conteúdo:', error);
+      return <div>Erro ao carregar conteúdo</div>;
     }
   };
 
