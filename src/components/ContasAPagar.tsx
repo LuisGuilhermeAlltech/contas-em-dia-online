@@ -449,23 +449,20 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
             return matchSearch;
           }
           
-          // Filtro de status
-          const statusConta = String(conta.status || 'pendente').toLowerCase().trim();
+          // Filtro de status - normalizar ambos
+          const statusConta = String(conta.status || 'Pendente').toLowerCase().trim();
           const statusFiltro = String(statusFilter).toLowerCase().trim();
           
-          // Match direto
-          if (statusConta === statusFiltro) {
-            return matchSearch;
+          // Match exato ou variantes
+          let matchStatus = false;
+          
+          if (statusFiltro === 'pago') {
+            matchStatus = statusConta === 'pago';
+          } else if (statusFiltro === 'parcial') {
+            matchStatus = statusConta === 'parcial';
+          } else if (statusFiltro === 'pendente') {
+            matchStatus = statusConta === 'pendente';
           }
-          
-          // Match com mapeamento
-          const statusMatches: Record<string, boolean> = {
-            'pendente': statusFiltro === 'pendente' && (statusConta === 'pendente' || statusConta === '' || statusConta === 'pending'),
-            'parcial': statusFiltro === 'parcial' && (statusConta === 'parcial' || statusConta === 'partial'),
-            'pago': statusFiltro === 'pago' && (statusConta === 'pago' || statusConta === 'paid' || statusConta === 'completo')
-          };
-          
-          const matchStatus = statusMatches[statusFiltro] || false;
           
           return matchSearch && matchStatus;
         } catch (innerError) {
