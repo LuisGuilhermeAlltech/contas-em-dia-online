@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 
 interface DashboardProps {
   selectedEmpresa: string;
@@ -185,7 +186,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              R$ {dashboardData.totalHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {formatCurrency(dashboardData.totalHoje)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Vencimento hoje</p>
           </CardContent>
@@ -198,7 +199,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              R$ {dashboardData.proximaSemana.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {formatCurrency(dashboardData.proximaSemana)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Vencimento em 7 dias</p>
           </CardContent>
@@ -211,7 +212,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              R$ {dashboardData.mesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {formatCurrency(dashboardData.mesAtual)}
             </div>
             <p className="text-xs text-gray-500 mt-1">A vencer este mês</p>
           </CardContent>
@@ -303,12 +304,12 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
                   <div>
                     <p className="font-medium text-gray-900">{conta.descricao}</p>
                     <p className="text-sm text-gray-600">
-                      Vencimento: {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                      Vencimento: {formatDate(conta.vencimento)}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-lg text-gray-900">
-                      R$ {(conta.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {formatCurrency(conta.saldo)}
                     </p>
                     <Badge variant={conta.status === 'Pago' ? 'default' : (conta.status === 'Parcial' ? 'secondary' : 'secondary')}>
                       {conta.status || 'Pendente'}

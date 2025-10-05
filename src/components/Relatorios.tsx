@@ -18,6 +18,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import type { Tables } from "@/integrations/supabase/types";
 
 interface RelatoriosProps {
@@ -243,7 +244,7 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
     const headers = ['Descrição', 'Vencimento', 'Valor Total', 'Total Pago', 'Saldo', 'Status'];
     const rows = contasData.map(conta => [
       conta.descricao || '',
-      conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '',
+      formatDate(conta.vencimento),
       (conta.valor_total || 0).toFixed(2),
       (conta.total_pago || 0).toFixed(2),
       (conta.saldo || 0).toFixed(2),
@@ -328,7 +329,7 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              R$ {resumoFinanceiro.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {formatCurrency(resumoFinanceiro.totalPago)}
             </div>
             <p className="text-sm text-gray-600">{resumoFinanceiro.contasPagas} contas</p>
           </CardContent>
@@ -343,7 +344,7 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              R$ {resumoFinanceiro.totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {formatCurrency(resumoFinanceiro.totalPendente)}
             </div>
             <p className="text-sm text-gray-600">{resumoFinanceiro.contasPendentes} contas</p>
           </CardContent>
@@ -358,7 +359,7 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              R$ {resumoFinanceiro.totalVencido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {formatCurrency(resumoFinanceiro.totalVencido)}
             </div>
             <p className="text-sm text-gray-600">{resumoFinanceiro.contasVencidas} contas</p>
           </CardContent>
@@ -430,7 +431,7 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
             </CardTitle>
             {periodoInicio && periodoFim && (
               <p className="text-sm text-blue-600">
-                {new Date(periodoInicio + 'T00:00:00').toLocaleDateString('pt-BR')} até {new Date(periodoFim + 'T00:00:00').toLocaleDateString('pt-BR')}
+                {formatDate(periodoInicio)} até {formatDate(periodoFim)}
               </p>
             )}
           </CardHeader>
@@ -439,13 +440,13 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {formatCurrency(resumoPeriodo.totalPago)}
                   </div>
                   <p className="text-sm text-gray-600">Total Pago</p>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    R$ {resumoPeriodo.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {formatCurrency(resumoPeriodo.totalAPagar)}
                   </div>
                   <p className="text-sm text-gray-600">Total a Pagar</p>
                 </div>
@@ -496,16 +497,16 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
                           <td className="border px-4 py-2 font-medium">{conta?.empresa || '-'}</td>
                           <td className="border px-4 py-2">{conta?.descricao || '-'}</td>
                           <td className="border px-4 py-2">
-                            {conta?.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                            {formatDate(conta?.vencimento)}
                           </td>
                           <td className="border px-4 py-2 text-right font-semibold">
-                            R$ {Number(conta?.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {formatCurrency(conta?.valor_total)}
                           </td>
                           <td className="border px-4 py-2 text-right text-green-600 font-semibold">
-                            R$ {Number(conta?.total_pago || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {formatCurrency(conta?.total_pago)}
                           </td>
                           <td className="border px-4 py-2 text-right text-orange-600 font-semibold">
-                            R$ {Number(conta?.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {formatCurrency(conta?.saldo)}
                           </td>
                           <td className="border px-4 py-2 text-center">
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -536,13 +537,13 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
                   {periodoInicio && periodoFim && (
                     <div className="flex gap-6">
                       <span className="text-green-600 font-semibold">
-                        Pago: R$ {resumoPeriodo.totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        Pago: R$ {formatCurrency(resumoPeriodo.totalPago)}
                       </span>
                       <span className="text-orange-600 font-semibold">
-                        A Pagar: R$ {resumoPeriodo.totalAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        A Pagar: R$ {formatCurrency(resumoPeriodo.totalAPagar)}
                       </span>
                       <span className="text-blue-600 font-semibold">
-                        Total Geral: R$ {(resumoPeriodo.totalPago + resumoPeriodo.totalAPagar).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        Total Geral: R$ {formatCurrency(resumoPeriodo.totalPago + resumoPeriodo.totalAPagar)}
                       </span>
                     </div>
                   )}
