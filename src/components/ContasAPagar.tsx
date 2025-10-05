@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,9 +67,19 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   });
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
+  // Ref para prevenir chamadas duplicadas
+  const loadingRef = useRef(false);
+
   // Carregar contas da view contas_view
   const loadContas = useCallback(async () => {
+    // Prevenir chamadas simultâneas
+    if (loadingRef.current) {
+      console.log("Carregamento já em andamento, ignorando chamada duplicada");
+      return;
+    }
+
     try {
+      loadingRef.current = true;
       setLoading(true);
       console.log("Carregando contas da view para empresa:", selectedEmpresa);
       
@@ -91,6 +101,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       console.error("Erro inesperado:", error);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, [selectedEmpresa]);
 
@@ -98,7 +109,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
     if (selectedEmpresa) {
       loadContas();
     }
-  }, [selectedEmpresa, loadContas]);
+  }, [selectedEmpresa]); // Removido loadContas das dependências para evitar loop
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,6 +438,11 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
 
   const filteredContas = useMemo(() => {
     try {
+      // Não filtrar se ainda estiver carregando
+      if (loading) {
+        return [];
+      }
+
       if (!Array.isArray(contas)) {
         console.warn('Contas não é um array:', contas);
         return [];
@@ -474,7 +490,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
       console.error('Erro crítico em filteredContas:', error);
       return [];
     }
-  }, [contas, searchTerm, statusFilter]);
+  }, [contas, searchTerm, statusFilter, loading]);
 
   const isFormValid = Boolean(
     formData.descricao?.trim() &&
