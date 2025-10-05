@@ -426,41 +426,57 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   };
 
   const filteredContas = useMemo(() => {
-    if (!Array.isArray(contas)) return [];
-    
-    return contas.filter(conta => {
-      try {
-        if (!conta || !conta.id) return false;
-        
-        // Filtro de busca por descrição
-        const searchLower = (searchTerm || '').toLowerCase().trim();
-        const descricao = (conta.descricao || '').toLowerCase();
-        const matchSearch = !searchLower || descricao.includes(searchLower);
-        
-        // Filtro de status - tratamento mais robusto
-        if (statusFilter === "all") {
-          return matchSearch;
-        }
-        
-        const statusConta = (conta.status || 'pendente').toLowerCase().trim();
-        const statusFiltro = statusFilter.toLowerCase().trim();
-        
-        // Mapeamento mais flexível de status
-        const statusMap: Record<string, string[]> = {
-          'pendente': ['pendente', 'pending', ''],
-          'parcial': ['parcial', 'partial'],
-          'pago': ['pago', 'paid', 'completo', 'complete']
-        };
-        
-        const statusPermitidos = statusMap[statusFiltro] || [statusFiltro];
-        const matchStatus = statusPermitidos.includes(statusConta);
-        
-        return matchSearch && matchStatus;
-      } catch (error) {
-        console.error('Erro ao filtrar conta:', error, conta);
-        return false;
+    try {
+      if (!Array.isArray(contas)) {
+        console.warn('Contas não é um array:', contas);
+        return [];
       }
-    });
+      
+      return contas.filter(conta => {
+        try {
+          // Verificação de segurança
+          if (!conta || typeof conta !== 'object' || !conta.id) {
+            return false;
+          }
+          
+          // Filtro de busca por descrição
+          const searchLower = String(searchTerm || '').toLowerCase().trim();
+          const descricao = String(conta.descricao || '').toLowerCase();
+          const matchSearch = !searchLower || descricao.includes(searchLower);
+          
+          // Se não há filtro de status, retorna apenas o match de busca
+          if (!statusFilter || statusFilter === "all") {
+            return matchSearch;
+          }
+          
+          // Filtro de status
+          const statusConta = String(conta.status || 'pendente').toLowerCase().trim();
+          const statusFiltro = String(statusFilter).toLowerCase().trim();
+          
+          // Match direto
+          if (statusConta === statusFiltro) {
+            return matchSearch;
+          }
+          
+          // Match com mapeamento
+          const statusMatches: Record<string, boolean> = {
+            'pendente': statusFiltro === 'pendente' && (statusConta === 'pendente' || statusConta === '' || statusConta === 'pending'),
+            'parcial': statusFiltro === 'parcial' && (statusConta === 'parcial' || statusConta === 'partial'),
+            'pago': statusFiltro === 'pago' && (statusConta === 'pago' || statusConta === 'paid' || statusConta === 'completo')
+          };
+          
+          const matchStatus = statusMatches[statusFiltro] || false;
+          
+          return matchSearch && matchStatus;
+        } catch (innerError) {
+          console.error('Erro ao filtrar conta individual:', innerError, conta);
+          return false;
+        }
+      });
+    } catch (error) {
+      console.error('Erro crítico em filteredContas:', error);
+      return [];
+    }
   }, [contas, searchTerm, statusFilter]);
 
   const isFormValid = Boolean(
@@ -775,11 +791,27 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
           <Input
             placeholder="Buscar por descrição..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              try {
+                setSearchTerm(e.target.value);
+              } catch (error) {
+                console.error('Erro ao atualizar busca:', error);
+              }
+            }}
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select 
+          value={statusFilter} 
+          onValueChange={(value) => {
+            try {
+              console.log('Mudando filtro para:', value);
+              setStatusFilter(value);
+            } catch (error) {
+              console.error('Erro ao mudar filtro:', error);
+            }
+          }}
+        >
           <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue />
@@ -799,7 +831,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
           <CardTitle>Lista de Contas</CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredContas.length === 0 ? (
+          {!Array.isArray(filteredContas) || filteredContas.length === 0 ? (
             <div className="text-center py-8">
               <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">
@@ -811,7 +843,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
           ) : (
             <div className="space-y-4">
               {filteredContas.map((conta) => {
-                if (!conta || !conta.id) return null;
+                try {
+                  if (!conta || !conta.id) return null;
                 return (
                   <div key={conta.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex-1">
@@ -890,6 +923,10 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                     </div>
                   </div>
                 );
+                } catch (renderError) {
+                  console.error('Erro ao renderizar conta:', renderError, conta);
+                  return null;
+                }
               })}
             </div>
           )}
