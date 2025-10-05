@@ -849,7 +849,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                         <p className="text-sm text-gray-600">
                           Vencimento: {conta.vencimento ? new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                         </p>
-                        {conta.status === "Parcial" && (
+                        {String(conta.status || '').toLowerCase() === "parcial" && (
                           <p className="text-xs text-blue-600">
                             Pago: R$ {(conta.total_pago || 0).toFixed(2)} | Saldo: R$ {(conta.saldo || 0).toFixed(2)}
                           </p>
@@ -875,7 +875,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
-                            {conta.status === "Parcial" && (
+                            {String(conta.status || '').toLowerCase() === "parcial" && (
                               <DropdownMenuItem 
                                 onClick={() => handleVerHistorico(conta)}
                               >
@@ -883,7 +883,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                                 Ver Histórico de Pagamentos
                               </DropdownMenuItem>
                             )}
-                            {conta.status !== "Pago" && conta.saldo && conta.saldo > 0 && (
+                            {String(conta.status || '').toLowerCase() !== "pago" && conta.saldo && conta.saldo > 0 && (
                               <DropdownMenuItem 
                                 onClick={() => handleMarcarComoPaga(conta)}
                               >
@@ -891,8 +891,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                                 Marcar como Paga
                               </DropdownMenuItem>
                             )}
-                            {conta.status !== "Pago" && (
-                              <DropdownMenuItem 
+                            {String(conta.status || '').toLowerCase() !== "pago" && (
+                              <DropdownMenuItem
                                 onClick={() => {
                                   setContaParaPagamento(conta);
                                   setIsPagamentoDialogOpen(true);
