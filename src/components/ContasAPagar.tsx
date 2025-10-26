@@ -488,6 +488,47 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                 </div>
               ) : (
                 <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex-1">
+                      <Label htmlFor="data-inicial">Data Inicial</Label>
+                      <Input
+                        id="data-inicial"
+                        type="date"
+                        placeholder="Selecione a data inicial"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="mt-6"
+                      onClick={(e) => {
+                        const input = (e.currentTarget.previousElementSibling as HTMLDivElement)?.querySelector('input');
+                        const dataInicial = input?.value;
+                        if (!dataInicial) {
+                          toast({
+                            title: "Data necessária",
+                            description: "Selecione uma data inicial",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        const datas: string[] = [];
+                        const data = new Date(dataInicial + 'T00:00:00');
+                        for (let i = 0; i < 12; i++) {
+                          const novaData = new Date(data);
+                          novaData.setMonth(data.getMonth() + i);
+                          datas.push(novaData.toISOString().split('T')[0]);
+                        }
+                        setVencimentosMultiplos(datas);
+                        toast({
+                          title: "Datas geradas",
+                          description: "12 datas mensais criadas com sucesso",
+                        });
+                      }}
+                    >
+                      Gerar 12 Meses
+                    </Button>
+                  </div>
                   <Label>Datas de Vencimento (máx. 12)</Label>
                   {vencimentosMultiplos.slice(0, 12).map((data, idx) => (
                     <div key={idx} className="flex gap-2 mt-2">
