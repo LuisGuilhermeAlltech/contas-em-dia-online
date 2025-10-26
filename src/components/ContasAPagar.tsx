@@ -514,7 +514,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                       </Button>
                     </div>
                   ))}
-                  {vencimentosMultiplos.length < 5 && (
+                  {vencimentosMultiplos.length < 12 && (
                     <Button
                       type="button"
                       variant="outline"
