@@ -111,7 +111,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         ? vencimentosMultiplos
             .map((d) => d.trim())
             .filter(Boolean)
-            .slice(0, 5)
+            .slice(0, 12)
             .map((d) => ({ ...base, vencimento: d }))
         : [{ ...base, vencimento: formData.vencimento }];
 
@@ -488,8 +488,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                 </div>
               ) : (
                 <div>
-                  <Label>Datas de Vencimento (máx. 5)</Label>
-                  {vencimentosMultiplos.slice(0, 5).map((data, idx) => (
+                  <Label>Datas de Vencimento (máx. 12)</Label>
+                  {vencimentosMultiplos.slice(0, 12).map((data, idx) => (
                     <div key={idx} className="flex gap-2 mt-2">
                       <Input
                         type="date"
