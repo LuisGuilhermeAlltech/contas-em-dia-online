@@ -20,12 +20,12 @@ export const useContas = (selectedEmpresa: string) => {
       setLoading(true);
       console.log("Carregando contas para empresa:", selectedEmpresa);
       
-      const { data: contasData, error } = await supabase
+      const { data: contasData, error, count } = await supabase
         .from('contas_view')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('empresa', selectedEmpresa)
         .order('vencimento', { ascending: true })
-        .limit(5000);
+        .range(0, 4999); // Buscar até 5000 registros
 
       if (error) {
         console.error("Erro ao carregar contas:", error);
