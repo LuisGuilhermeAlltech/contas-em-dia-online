@@ -18,29 +18,57 @@ export const useContas = (selectedEmpresa: string) => {
     try {
       loadingRef.current = true;
       setLoading(true);
-      console.log("🔄 Carregando TODAS as contas para empresa:", selectedEmpresa);
+      console.log("🔄 Carregando contas com paginação para empresa:", selectedEmpresa);
       
-      // Buscar TODAS as contas - forçando range explícito para evitar limite de 1000
-      const { data: contasData, error, count } = await supabase
+      // Primeiro, buscar o count total
+      const { count: totalCount, error: countError } = await supabase
         .from('contas_view')
-        .select('*', { count: 'exact', head: false })
-        .eq('empresa', selectedEmpresa)
-        .order('vencimento', { ascending: true })
-        .range(0, 9999); // Buscar até 10.000 registros
+        .select('*', { count: 'exact', head: true })
+        .eq('empresa', selectedEmpresa);
 
-      if (error) {
-        console.error("❌ Erro ao carregar contas:", error);
-        throw error;
+      if (countError) {
+        console.error("❌ Erro ao contar contas:", countError);
+        throw countError;
       }
 
-      setContas(contasData || []);
-      const total = contasData?.length || 0;
-      const apos07 = contasData?.filter(c => c.vencimento && c.vencimento > '2025-11-07').length || 0;
-      const totalDB = count || 0;
-      console.log(`✅ Contas carregadas: ${total} de ${totalDB} no DB (${apos07} após 07/11)`);
-      if (contasData && contasData.length > 0) {
-        const ultima = contasData[contasData.length - 1];
-        console.log(`📅 Última data carregada: ${ultima.vencimento} - ${ultima.descricao}`);
+      console.log(`📊 Total de contas no banco: ${totalCount}`);
+
+      // Carregar todas as contas usando paginação de 1000 em 1000
+      const pageSize = 1000;
+      const totalPages = Math.ceil((totalCount || 0) / pageSize);
+      let allContas: ContaView[] = [];
+
+      for (let page = 0; page < totalPages; page++) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        
+        console.log(`📥 Carregando página ${page + 1}/${totalPages} (registros ${from}-${to})`);
+        
+        const { data: pageData, error: pageError } = await supabase
+          .from('contas_view')
+          .select('*')
+          .eq('empresa', selectedEmpresa)
+          .order('vencimento', { ascending: true })
+          .range(from, to);
+
+        if (pageError) {
+          console.error(`❌ Erro ao carregar página ${page + 1}:`, pageError);
+          throw pageError;
+        }
+
+        if (pageData) {
+          allContas = [...allContas, ...pageData];
+          console.log(`✓ Página ${page + 1} carregada: ${pageData.length} registros`);
+        }
+      }
+
+      setContas(allContas);
+      const apos07 = allContas.filter(c => c.vencimento && c.vencimento > '2025-11-07').length;
+      console.log(`✅ Total carregado: ${allContas.length} de ${totalCount} (${apos07} após 07/11)`);
+      
+      if (allContas.length > 0) {
+        const ultima = allContas[allContas.length - 1];
+        console.log(`📅 Última conta: ${ultima.vencimento} - ${ultima.descricao}`);
       }
     } catch (error) {
       console.error("Erro inesperado ao carregar contas:", error);

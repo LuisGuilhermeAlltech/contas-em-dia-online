@@ -429,7 +429,12 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-gray-900">Contas a Pagar</h2>
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900">Contas a Pagar</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {contas.length} conta{contas.length !== 1 ? 's' : ''} carregada{contas.length !== 1 ? 's' : ''}
+          </p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
