@@ -24,7 +24,8 @@ export const useContas = (selectedEmpresa: string) => {
         .from('contas_view')
         .select('*')
         .eq('empresa', selectedEmpresa)
-        .order('vencimento', { ascending: true });
+        .order('vencimento', { ascending: true })
+        .limit(5000);
 
       if (error) {
         console.error("Erro ao carregar contas:", error);
