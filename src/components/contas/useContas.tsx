@@ -33,7 +33,13 @@ export const useContas = (selectedEmpresa: string) => {
       }
 
       setContas(contasData || []);
-      console.log("Contas carregadas:", contasData?.length || 0);
+      const total = contasData?.length || 0;
+      const apos07 = contasData?.filter(c => c.vencimento && c.vencimento > '2025-11-07').length || 0;
+      console.log(`✅ Contas carregadas: ${total} (${apos07} após 07/11)`);
+      if (contasData && contasData.length > 0) {
+        const ultima = contasData[contasData.length - 1];
+        console.log(`📅 Última data: ${ultima.vencimento} - ${ultima.descricao}`);
+      }
     } catch (error) {
       console.error("Erro inesperado ao carregar contas:", error);
       setContas([]);
