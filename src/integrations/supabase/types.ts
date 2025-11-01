@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -126,7 +126,18 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      rpc_total_contas_do_dia: {
+        Args: { p_data: string; p_empresa: string }
+        Returns: number
+      }
+      rpc_total_mes_atual: {
+        Args: { p_data_fim: string; p_data_inicio: string; p_empresa: string }
+        Returns: number
+      }
+      rpc_total_proxima_semana: {
+        Args: { p_data_fim: string; p_data_inicio: string; p_empresa: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
