@@ -13,6 +13,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import { startOfDay, addDays } from "date-fns";
 
 interface DashboardProps {
   selectedEmpresa: string;
@@ -40,13 +42,29 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
   });
   const [contasProximas, setContasProximas] = useState<ContaView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [debugContasHoje, setDebugContasHoje] = useState<ContaView[]>([]);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       console.log("Carregando dados do dashboard para empresa:", selectedEmpresa);
 
-      // Carregar contas da view
+      // Definir timezone de Brasília
+      const TZ = 'America/Sao_Paulo';
+      
+      // Calcular início e fim do dia em São Paulo
+      const now = new Date();
+      const hojeSP = toZonedTime(now, TZ);
+      const inicioHojeSP = startOfDay(hojeSP);
+      const inicioAmanhaSP = addDays(inicioHojeSP, 1);
+      
+      // Converter para UTC para query
+      const startISO = fromZonedTime(inicioHojeSP, TZ).toISOString();
+      const endISO = fromZonedTime(inicioAmanhaSP, TZ).toISOString();
+
+      console.log(`🕐 Filtrando contas do dia: ${startISO} até ${endISO}`);
+
+      // Carregar TODAS as contas da empresa (sem limite de 1000)
       const { data: contas, error } = await supabase
         .from('contas_view')
         .select('*')
@@ -62,12 +80,26 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
         return;
       }
 
-      console.log("Contas processadas para dashboard:", contas);
+      console.log(`📊 Total de contas carregadas: ${contas.length}`);
 
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
+      // Filtrar contas do dia HOJE (vencimento >= startISO e < endISO)
+      const contasHoje = contas.filter(c => {
+        if (!c.vencimento) return false;
+        if (c.status === 'Cancelada') return false;
+        
+        const vencimentoISO = new Date(c.vencimento + 'T00:00:00').toISOString();
+        return vencimentoISO >= startISO && vencimentoISO < endISO;
+      });
+
+      // Calcular TOTAL HOJE somando valor_total
+      const totalHoje = contasHoje.reduce((acc, c) => acc + Number(c.valor_total || 0), 0);
+      
+      console.log(`💰 Total Hoje: R$ ${totalHoje.toFixed(2)} (${contasHoje.length} contas)`);
+      setDebugContasHoje(contasHoje);
 
       // Data para próxima semana (7 dias)
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
       const proximaSemana = new Date(hoje);
       proximaSemana.setDate(proximaSemana.getDate() + 7);
 
@@ -75,7 +107,6 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
 
-      let totalHoje = 0;
       let valorProximaSemana = 0;
       let valorMesAtual = 0;
       let contasVencidas = 0;
@@ -92,11 +123,6 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
         
         const isPago = conta.status === 'Pago';
         const isVencida = conta.status !== 'Pago' && vencimento < hoje;
-
-        // Total Hoje → SUM(valor_total) vencimento = hoje (todos os status exceto canceladas)
-        if (vencimento.getTime() === hoje.getTime() && conta.status !== 'Cancelada') {
-          totalHoje += conta.valor_total || 0;
-        }
 
         // Próx. Semana → vencimento ≤ hoje+7
         if (vencimento <= proximaSemana && vencimento >= hoje && !isPago) {
@@ -189,6 +215,28 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
               R$ {formatCurrency(dashboardData.totalHoje)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Vencimento hoje</p>
+            
+            {/* Debug Mode - Diagnóstico das contas de hoje */}
+            {debugContasHoje.length > 0 && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                <p className="font-semibold text-yellow-800 mb-2">
+                  🔍 Diagnóstico: {debugContasHoje.length} contas encontradas hoje
+                </p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {debugContasHoje.slice(0, 5).map((c, idx) => (
+                    <div key={c.id} className="text-yellow-700">
+                      {idx + 1}. {c.descricao} - R$ {Number(c.valor_total || 0).toFixed(2)} ({c.vencimento})
+                    </div>
+                  ))}
+                  {debugContasHoje.length > 5 && (
+                    <p className="text-yellow-600 italic">... e mais {debugContasHoje.length - 5} contas</p>
+                  )}
+                </div>
+                <p className="font-bold text-yellow-900 mt-2">
+                  Soma: R$ {debugContasHoje.reduce((acc, c) => acc + Number(c.valor_total || 0), 0).toFixed(2)}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
