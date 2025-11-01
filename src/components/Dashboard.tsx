@@ -93,9 +93,9 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
         const isPago = conta.status === 'Pago';
         const isVencida = conta.status !== 'Pago' && vencimento < hoje;
 
-        // Total Hoje → SUM(saldo) vencimento = hoje
-        if (vencimento.getTime() === hoje.getTime() && !isPago) {
-          totalHoje += conta.saldo || 0;
+        // Total Hoje → SUM(valor_total) vencimento = hoje (todos os status exceto canceladas)
+        if (vencimento.getTime() === hoje.getTime() && conta.status !== 'Cancelada') {
+          totalHoje += conta.valor_total || 0;
         }
 
         // Próx. Semana → vencimento ≤ hoje+7
