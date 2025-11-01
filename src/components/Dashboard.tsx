@@ -42,7 +42,6 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
   });
   const [contasProximas, setContasProximas] = useState<ContaView[]>([]);
   const [loading, setLoading] = useState(true);
-  const [debugContasHoje, setDebugContasHoje] = useState<ContaView[]>([]);
 
   const loadDashboardData = async () => {
     try {
@@ -82,10 +81,10 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
 
       console.log(`📊 Total de contas carregadas: ${contas.length}`);
 
-      // Filtrar contas do dia HOJE (vencimento >= startISO e < endISO)
+      // Filtrar contas do dia HOJE com status Pendente (vencimento >= startISO e < endISO)
       const contasHoje = contas.filter(c => {
         if (!c.vencimento) return false;
-        if (c.status === 'Cancelada') return false;
+        if (c.status !== 'Pendente') return false; // Apenas contas pendentes
         
         const vencimentoISO = new Date(c.vencimento + 'T00:00:00').toISOString();
         return vencimentoISO >= startISO && vencimentoISO < endISO;
@@ -94,8 +93,7 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       // Calcular TOTAL HOJE somando valor_total
       const totalHoje = contasHoje.reduce((acc, c) => acc + Number(c.valor_total || 0), 0);
       
-      console.log(`💰 Total Hoje: R$ ${totalHoje.toFixed(2)} (${contasHoje.length} contas)`);
-      setDebugContasHoje(contasHoje);
+      console.log(`💰 Total Hoje: R$ ${totalHoje.toFixed(2)} (${contasHoje.length} contas pendentes)`);
 
       // Data para próxima semana (7 dias)
       const hoje = new Date();
@@ -215,28 +213,6 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
               R$ {formatCurrency(dashboardData.totalHoje)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Vencimento hoje</p>
-            
-            {/* Debug Mode - Diagnóstico das contas de hoje */}
-            {debugContasHoje.length > 0 && (
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                <p className="font-semibold text-yellow-800 mb-2">
-                  🔍 Diagnóstico: {debugContasHoje.length} contas encontradas hoje
-                </p>
-                <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {debugContasHoje.slice(0, 5).map((c, idx) => (
-                    <div key={c.id} className="text-yellow-700">
-                      {idx + 1}. {c.descricao} - R$ {Number(c.valor_total || 0).toFixed(2)} ({c.vencimento})
-                    </div>
-                  ))}
-                  {debugContasHoje.length > 5 && (
-                    <p className="text-yellow-600 italic">... e mais {debugContasHoje.length - 5} contas</p>
-                  )}
-                </div>
-                <p className="font-bold text-yellow-900 mt-2">
-                  Soma: R$ {debugContasHoje.reduce((acc, c) => acc + Number(c.valor_total || 0), 0).toFixed(2)}
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
