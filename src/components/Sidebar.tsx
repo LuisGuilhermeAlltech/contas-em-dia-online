@@ -9,8 +9,10 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
-  Download
+  Download,
+  Stethoscope
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface SidebarProps {
   activeMenu: string;
@@ -108,6 +110,23 @@ export const Sidebar = ({
               </li>
             );
           })}
+          
+          {/* Diagnóstico Financeiro - visível apenas em modo edição */}
+          {process.env.NODE_ENV !== 'production' && (
+            <li className="pt-4 border-t border-gray-200">
+              <Link to="/relatorios/diagnostico">
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start h-12 ${
+                    !sidebarOpen ? 'px-3' : 'px-4'
+                  } text-orange-600 hover:bg-orange-50`}
+                >
+                  <Stethoscope className="h-5 w-5" />
+                  {sidebarOpen && <span className="ml-3 text-sm">Diagnóstico</span>}
+                </Button>
+              </Link>
+            </li>
+          )}
         </ul>
       </nav>
     </div>

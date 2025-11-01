@@ -51,19 +51,68 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
       // Definir timezone de Brasília
       const TZ = 'America/Sao_Paulo';
       
-      // Calcular início e fim do dia em São Paulo
+      // Calcular datas para as queries
       const now = new Date();
       const hojeSP = toZonedTime(now, TZ);
       const inicioHojeSP = startOfDay(hojeSP);
-      const inicioAmanhaSP = addDays(inicioHojeSP, 1);
       
-      // Converter para UTC para query
-      const startISO = fromZonedTime(inicioHojeSP, TZ).toISOString();
-      const endISO = fromZonedTime(inicioAmanhaSP, TZ).toISOString();
+      // Data de hoje em formato YYYY-MM-DD para o RPC
+      const dataHoje = inicioHojeSP.toISOString().split('T')[0];
 
-      console.log(`🕐 Filtrando contas do dia: ${startISO} até ${endISO}`);
+      // Chamar RPC para Total Hoje (fonte da verdade)
+      const { data: totalHojeRpc, error: errorHoje } = await supabase
+        .rpc('rpc_total_contas_do_dia', {
+          p_empresa: selectedEmpresa,
+          p_data: dataHoje
+        });
 
-      // Carregar TODAS as contas da empresa (sem limite de 1000)
+      if (errorHoje) {
+        console.error("Erro ao calcular Total Hoje via RPC:", errorHoje);
+      }
+
+      const totalHoje = Number(totalHojeRpc || 0);
+      console.log(`💰 Total Hoje via RPC: R$ ${totalHoje.toFixed(2)}`);
+
+      // Calcular intervalos para Próxima Semana e Mês Atual
+      const proximaSemana = addDays(inicioHojeSP, 7);
+      const dataInicioSemana = inicioHojeSP.toISOString().split('T')[0];
+      const dataFimSemana = proximaSemana.toISOString().split('T')[0];
+
+      // Primeiro e último dia do mês atual
+      const inicioMes = new Date(hojeSP.getFullYear(), hojeSP.getMonth(), 1);
+      const fimMes = new Date(hojeSP.getFullYear(), hojeSP.getMonth() + 1, 0);
+      const dataInicioMes = inicioMes.toISOString().split('T')[0];
+      const dataFimMes = fimMes.toISOString().split('T')[0];
+
+      // Chamar RPC para Próxima Semana
+      const { data: totalSemanaRpc, error: errorSemana } = await supabase
+        .rpc('rpc_total_proxima_semana', {
+          p_empresa: selectedEmpresa,
+          p_data_inicio: dataInicioSemana,
+          p_data_fim: dataFimSemana
+        });
+
+      if (errorSemana) {
+        console.error("Erro ao calcular Próxima Semana via RPC:", errorSemana);
+      }
+
+      const valorProximaSemana = Number(totalSemanaRpc || 0);
+
+      // Chamar RPC para Mês Atual
+      const { data: totalMesRpc, error: errorMes } = await supabase
+        .rpc('rpc_total_mes_atual', {
+          p_empresa: selectedEmpresa,
+          p_data_inicio: dataInicioMes,
+          p_data_fim: dataFimMes
+        });
+
+      if (errorMes) {
+        console.error("Erro ao calcular Mês Atual via RPC:", errorMes);
+      }
+
+      const valorMesAtual = Number(totalMesRpc || 0);
+
+      // Carregar contas para cálculos complementares e contadores
       const { data: contas, error } = await supabase
         .from('contas_view')
         .select('*')
@@ -74,77 +123,41 @@ export const Dashboard = ({ selectedEmpresa }: DashboardProps) => {
         return;
       }
 
-      if (!contas) {
-        console.log("Nenhuma conta encontrada");
-        return;
-      }
-
-      console.log(`📊 Total de contas carregadas: ${contas.length}`);
-
-      // Filtrar contas do dia HOJE com status Pendente (vencimento >= startISO e < endISO)
-      const contasHoje = contas.filter(c => {
-        if (!c.vencimento) return false;
-        if (c.status !== 'Pendente') return false; // Apenas contas pendentes
-        
-        const vencimentoISO = new Date(c.vencimento + 'T00:00:00').toISOString();
-        return vencimentoISO >= startISO && vencimentoISO < endISO;
-      });
-
-      // Calcular TOTAL HOJE somando valor_total
-      const totalHoje = contasHoje.reduce((acc, c) => acc + Number(c.valor_total || 0), 0);
-      
-      console.log(`💰 Total Hoje: R$ ${totalHoje.toFixed(2)} (${contasHoje.length} contas pendentes)`);
-
-      // Data para próxima semana (7 dias)
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      const proximaSemana = new Date(hoje);
-      proximaSemana.setDate(proximaSemana.getDate() + 7);
-
-      // Primeiro e último dia do mês atual
-      const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-
-      let valorProximaSemana = 0;
-      let valorMesAtual = 0;
       let contasVencidas = 0;
       let contasPagas = 0;
       let contasPendentes = 0;
       const contasVencemProximo: ContaView[] = [];
 
-      contas.forEach(conta => {
-        if (!conta.vencimento) return;
-        
-        // Corrigir parsing da data para evitar problema de timezone
-        const vencimento = new Date(conta.vencimento + 'T00:00:00');
-        vencimento.setHours(0, 0, 0, 0);
-        
-        const isPago = conta.status === 'Pago';
-        const isVencida = conta.status !== 'Pago' && vencimento < hoje;
+      if (contas) {
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
 
-        // Próx. Semana → vencimento ≤ hoje+7
-        if (vencimento <= proximaSemana && vencimento >= hoje && !isPago) {
-          valorProximaSemana += conta.saldo || 0;
-          contasVencemProximo.push(conta);
-        }
+        contas.forEach(conta => {
+          if (!conta.vencimento) return;
+          
+          const vencimento = new Date(conta.vencimento + 'T00:00:00');
+          vencimento.setHours(0, 0, 0, 0);
+          
+          const isPago = conta.status === 'Pago';
+          const isVencida = conta.status !== 'Pago' && vencimento < hoje;
 
-        // Mês Atual → vencimento dentro do mês
-        if (vencimento >= inicioMes && vencimento <= fimMes && !isPago) {
-          valorMesAtual += conta.saldo || 0;
-        }
-
-        // Contadores por status
-        if (isPago) {
-          // Contar apenas contas pagas do mês atual
-          if (vencimento >= inicioMes && vencimento <= fimMes) {
-            contasPagas++;
+          // Próx. Semana → vencimento ≤ hoje+7 (status Pendente)
+          if (vencimento <= proximaSemana && vencimento >= inicioHojeSP && conta.status === 'Pendente') {
+            contasVencemProximo.push(conta);
           }
-        } else if (isVencida) {
-          contasVencidas++;
-        } else {
-          contasPendentes++;
-        }
-      });
+
+          // Contadores por status
+          if (isPago) {
+            if (vencimento >= inicioMes && vencimento <= fimMes) {
+              contasPagas++;
+            }
+          } else if (isVencida) {
+            contasVencidas++;
+          } else {
+            contasPendentes++;
+          }
+        });
+      }
 
       const newDashboardData: DashboardData = {
         totalHoje,
