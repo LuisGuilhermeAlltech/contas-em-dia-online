@@ -126,6 +126,29 @@ export type Database = {
       }
     }
     Functions: {
+      rpc_contas_proximas: {
+        Args: { p_empresa: string; p_hoje: string }
+        Returns: {
+          descricao: string
+          id: string
+          saldo: number
+          status: string
+          vencimento: string
+        }[]
+      }
+      rpc_dashboard_resumo: {
+        Args: {
+          p_empresa: string
+          p_fim_mes: string
+          p_hoje: string
+          p_inicio_mes: string
+        }
+        Returns: {
+          contas_pagas_mes: number
+          contas_pendentes: number
+          contas_vencidas: number
+        }[]
+      }
       rpc_total_contas_do_dia: {
         Args: { p_data: string; p_empresa: string }
         Returns: number

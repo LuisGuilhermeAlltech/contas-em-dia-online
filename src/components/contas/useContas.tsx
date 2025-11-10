@@ -33,34 +33,40 @@ export const useContas = (selectedEmpresa: string) => {
 
       console.log(`📊 Total de contas no banco: ${totalCount}`);
 
-      // Carregar todas as contas usando paginação de 1000 em 1000
-      const pageSize = 1000;
+      // Carregar todas as contas usando paginação de 500 em 500 (otimizado)
+      const pageSize = 500;
       const totalPages = Math.ceil((totalCount || 0) / pageSize);
-      let allContas: ContaView[] = [];
-
-      for (let page = 0; page < totalPages; page++) {
+      
+      console.log(`📥 Carregando ${totalPages} páginas em paralelo...`);
+      
+      // Buscar todas as páginas em paralelo para melhor performance
+      const pagePromises = Array.from({ length: totalPages }, (_, page) => {
         const from = page * pageSize;
         const to = from + pageSize - 1;
-        
-        console.log(`📥 Carregando página ${page + 1}/${totalPages} (registros ${from}-${to})`);
-        
-        const { data: pageData, error: pageError } = await supabase
+
+        return supabase
           .from('contas_view')
           .select('*')
           .eq('empresa', selectedEmpresa)
           .order('vencimento', { ascending: true })
           .range(from, to);
+      });
 
+      const results = await Promise.all(pagePromises);
+      let allContas: ContaView[] = [];
+
+      for (const { data: pageData, error: pageError } of results) {
         if (pageError) {
-          console.error(`❌ Erro ao carregar página ${page + 1}:`, pageError);
+          console.error(`❌ Erro ao carregar página:`, pageError);
           throw pageError;
         }
 
         if (pageData) {
           allContas = [...allContas, ...pageData];
-          console.log(`✓ Página ${page + 1} carregada: ${pageData.length} registros`);
         }
       }
+      
+      console.log(`✅ Total carregado em paralelo: ${allContas.length} registros`);
 
       setContas(allContas);
       const apos07 = allContas.filter(c => c.vencimento && c.vencimento > '2025-11-07').length;
