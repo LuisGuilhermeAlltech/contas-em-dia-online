@@ -37,87 +37,137 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
   const fimSemana = format(new Date(agoraSP.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
 
   // Query para Total Hoje
-  const { data: totalHoje = 0, isLoading: loadingHoje } = useQuery({
+  const { data: totalHoje = 0, isLoading: loadingHoje, isError: errorHoje } = useQuery({
     queryKey: ['totalHoje', selectedEmpresa, hoje],
     queryFn: async () => {
-      const inicio = performance.now();
-      const { data, error } = await supabase.rpc('rpc_total_contas_do_dia', {
-        p_empresa: selectedEmpresa,
-        p_data: hoje,
-      });
-      const fim = performance.now();
-      console.log(`⚡ rpc_total_contas_do_dia: ${(fim - inicio).toFixed(2)}ms`);
-      if (error) throw error;
-      return Number(data) || 0;
+      try {
+        const inicio = performance.now();
+        const { data, error } = await supabase.rpc('rpc_total_contas_do_dia', {
+          p_empresa: selectedEmpresa,
+          p_data: hoje,
+        });
+        const fim = performance.now();
+        console.log(`⚡ rpc_total_contas_do_dia: ${(fim - inicio).toFixed(2)}ms`);
+        if (error) {
+          console.error('Erro em rpc_total_contas_do_dia:', error);
+          throw error;
+        }
+        return Number(data) || 0;
+      } catch (error) {
+        console.error('Erro ao buscar total hoje:', error);
+        return 0;
+      }
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Query para Próxima Semana
-  const { data: proximaSemana = 0, isLoading: loadingSemana } = useQuery({
+  const { data: proximaSemana = 0, isLoading: loadingSemana, isError: errorSemana } = useQuery({
     queryKey: ['proximaSemana', selectedEmpresa, inicioSemana, fimSemana],
     queryFn: async () => {
-      const inicio = performance.now();
-      const { data, error } = await supabase.rpc('rpc_total_proxima_semana', {
-        p_empresa: selectedEmpresa,
-        p_data_inicio: inicioSemana,
-        p_data_fim: fimSemana,
-      });
-      const fim = performance.now();
-      console.log(`⚡ rpc_total_proxima_semana: ${(fim - inicio).toFixed(2)}ms`);
-      if (error) throw error;
-      return Number(data) || 0;
+      try {
+        const inicio = performance.now();
+        const { data, error } = await supabase.rpc('rpc_total_proxima_semana', {
+          p_empresa: selectedEmpresa,
+          p_data_inicio: inicioSemana,
+          p_data_fim: fimSemana,
+        });
+        const fim = performance.now();
+        console.log(`⚡ rpc_total_proxima_semana: ${(fim - inicio).toFixed(2)}ms`);
+        if (error) {
+          console.error('Erro em rpc_total_proxima_semana:', error);
+          throw error;
+        }
+        return Number(data) || 0;
+      } catch (error) {
+        console.error('Erro ao buscar próxima semana:', error);
+        return 0;
+      }
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Query para Mês Atual
-  const { data: mesAtual = 0, isLoading: loadingMes } = useQuery({
+  const { data: mesAtual = 0, isLoading: loadingMes, isError: errorMes } = useQuery({
     queryKey: ['mesAtual', selectedEmpresa, inicioMes, fimMes],
     queryFn: async () => {
-      const inicio = performance.now();
-      const { data, error } = await supabase.rpc('rpc_total_mes_atual', {
-        p_empresa: selectedEmpresa,
-        p_data_inicio: inicioMes,
-        p_data_fim: fimMes,
-      });
-      const fim = performance.now();
-      console.log(`⚡ rpc_total_mes_atual: ${(fim - inicio).toFixed(2)}ms`);
-      if (error) throw error;
-      return Number(data) || 0;
+      try {
+        const inicio = performance.now();
+        const { data, error } = await supabase.rpc('rpc_total_mes_atual', {
+          p_empresa: selectedEmpresa,
+          p_data_inicio: inicioMes,
+          p_data_fim: fimMes,
+        });
+        const fim = performance.now();
+        console.log(`⚡ rpc_total_mes_atual: ${(fim - inicio).toFixed(2)}ms`);
+        if (error) {
+          console.error('Erro em rpc_total_mes_atual:', error);
+          throw error;
+        }
+        return Number(data) || 0;
+      } catch (error) {
+        console.error('Erro ao buscar mês atual:', error);
+        return 0;
+      }
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Query para Resumo (contadores)
-  const { data: resumo, isLoading: loadingResumo } = useQuery<DashboardResumo>({
+  const { data: resumo, isLoading: loadingResumo, isError: errorResumo } = useQuery<DashboardResumo>({
     queryKey: ['dashboardResumo', selectedEmpresa, hoje, inicioMes, fimMes],
     queryFn: async () => {
-      const inicio = performance.now();
-      const { data, error } = await supabase.rpc('rpc_dashboard_resumo', {
-        p_empresa: selectedEmpresa,
-        p_hoje: hoje,
-        p_inicio_mes: inicioMes,
-        p_fim_mes: fimMes,
-      });
-      const fim = performance.now();
-      console.log(`⚡ rpc_dashboard_resumo: ${(fim - inicio).toFixed(2)}ms`);
-      if (error) throw error;
-      return data[0] || { contas_vencidas: 0, contas_pendentes: 0, contas_pagas_mes: 0 };
+      try {
+        const inicio = performance.now();
+        const { data, error } = await supabase.rpc('rpc_dashboard_resumo', {
+          p_empresa: selectedEmpresa,
+          p_hoje: hoje,
+          p_inicio_mes: inicioMes,
+          p_fim_mes: fimMes,
+        });
+        const fim = performance.now();
+        console.log(`⚡ rpc_dashboard_resumo: ${(fim - inicio).toFixed(2)}ms`);
+        if (error) {
+          console.error('Erro em rpc_dashboard_resumo:', error);
+          throw error;
+        }
+        return (Array.isArray(data) && data.length > 0) ? data[0] : { contas_vencidas: 0, contas_pendentes: 0, contas_pagas_mes: 0 };
+      } catch (error) {
+        console.error('Erro ao buscar resumo:', error);
+        return { contas_vencidas: 0, contas_pendentes: 0, contas_pagas_mes: 0 };
+      }
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Query para Contas Próximas
-  const { data: contasProximas = [], isLoading: loadingProximas } = useQuery<ContaProxima[]>({
+  const { data: contasProximas = [], isLoading: loadingProximas, isError: errorProximas } = useQuery<ContaProxima[]>({
     queryKey: ['contasProximas', selectedEmpresa, hoje],
     queryFn: async () => {
-      const inicio = performance.now();
-      const { data, error } = await supabase.rpc('rpc_contas_proximas', {
-        p_empresa: selectedEmpresa,
-        p_hoje: hoje,
-      });
-      const fim = performance.now();
-      console.log(`⚡ rpc_contas_proximas: ${(fim - inicio).toFixed(2)}ms`);
-      if (error) throw error;
-      return data || [];
+      try {
+        const inicio = performance.now();
+        const { data, error } = await supabase.rpc('rpc_contas_proximas', {
+          p_empresa: selectedEmpresa,
+          p_hoje: hoje,
+        });
+        const fim = performance.now();
+        console.log(`⚡ rpc_contas_proximas: ${(fim - inicio).toFixed(2)}ms`);
+        if (error) {
+          console.error('Erro em rpc_contas_proximas:', error);
+          throw error;
+        }
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error('Erro ao buscar contas próximas:', error);
+        return [];
+      }
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const getNomeEmpresa = (id: string) => {
@@ -134,6 +184,11 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
 
   // Loading state global
   const isLoading = loadingHoje || loadingSemana || loadingMes || loadingResumo || loadingProximas;
+  const hasError = errorHoje || errorSemana || errorMes || errorResumo || errorProximas;
+
+  // Proteção contra undefined
+  const resumoSeguro = resumo || { contas_vencidas: 0, contas_pendentes: 0, contas_pagas_mes: 0 };
+  const contasProximasSeguro = Array.isArray(contasProximas) ? contasProximas : [];
 
   return (
     <div className="space-y-8 p-6">
@@ -144,6 +199,15 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             <p className="text-sm text-muted-foreground">Carregando dashboard...</p>
           </div>
+        </div>
+      )}
+
+      {/* Erro global */}
+      {hasError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 text-sm">
+            ⚠️ Alguns dados não puderam ser carregados. Os valores exibidos podem estar incompletos.
+          </p>
         </div>
       )}
 
@@ -198,7 +262,7 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
             <CardTitle className="text-sm font-medium">Contas Pagas no Mês</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{resumo?.contas_pagas_mes || 0}</div>
+            <div className="text-2xl font-bold">{resumoSeguro.contas_pagas_mes || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Contas quitadas este mês
             </p>
@@ -214,7 +278,7 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-destructive">
-              {resumo?.contas_vencidas || 0}
+              {resumoSeguro.contas_vencidas || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Contas em aberto com vencimento anterior a hoje
@@ -228,7 +292,7 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-yellow-600">
-              {resumo?.contas_pendentes || 0}
+              {resumoSeguro.contas_pendentes || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Contas em aberto a vencer hoje ou futuramente
@@ -242,7 +306,7 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">
-              {resumo?.contas_pagas_mes || 0}
+              {resumoSeguro.contas_pagas_mes || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Total de contas pagas neste mês
@@ -258,25 +322,25 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
           <CardDescription>Próximas contas a vencer nos próximos 7 dias</CardDescription>
         </CardHeader>
         <CardContent>
-          {contasProximas.length === 0 ? (
+          {contasProximasSeguro.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhuma conta próxima ao vencimento.</p>
           ) : (
             <div className="space-y-4">
-              {contasProximas.map((conta) => (
+              {contasProximasSeguro.map((conta) => (
                 <div
-                  key={conta.id}
+                  key={conta?.id || Math.random()}
                   className="flex items-center justify-between border-b pb-3 last:border-0"
                 >
                   <div className="space-y-1">
-                    <p className="font-medium">{conta.descricao}</p>
+                    <p className="font-medium">{conta?.descricao || '-'}</p>
                     <p className="text-sm text-muted-foreground">
-                      Vencimento: {formatDate(conta.vencimento)}
+                      Vencimento: {conta?.vencimento ? formatDate(conta.vencimento) : '-'}
                     </p>
                   </div>
                   <div className="text-right space-y-1">
-                    <p className="font-bold">{formatCurrency(conta.saldo)}</p>
-                    <Badge variant={conta.status === "Pendente" ? "outline" : "secondary"}>
-                      {conta.status}
+                    <p className="font-bold">{formatCurrency(conta?.saldo || 0)}</p>
+                    <Badge variant={conta?.status === "Pendente" ? "outline" : "secondary"}>
+                      {conta?.status || 'N/A'}
                     </Badge>
                   </div>
                 </div>

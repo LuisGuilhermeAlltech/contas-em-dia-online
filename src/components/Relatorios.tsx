@@ -65,12 +65,12 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
       if (error) {
         console.error("Erro ao carregar dados:", error);
         toast.error("Erro ao carregar dados do relatório");
+        setContas([]);
         return;
       }
 
-      if (!data) return;
-
-      setContas(data);
+      const contasSeguras = Array.isArray(data) ? data : [];
+      setContas(contasSeguras);
       
       // Calcular resumo financeiro
       const hoje = new Date();
@@ -83,22 +83,26 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
       let contasPendentes = 0;
       let contasVencidas = 0;
 
-      data.forEach(conta => {
-        if (!conta.vencimento) return;
+      contasSeguras.forEach(conta => {
+        if (!conta || !conta.vencimento) return;
         
-        const vencimento = new Date(conta.vencimento + 'T00:00:00');
-        const isPago = conta.status === 'Pago';
-        const isVencida = conta.status !== 'Pago' && vencimento < hoje;
+        try {
+          const vencimento = new Date(conta.vencimento + 'T00:00:00');
+          const isPago = conta.status === 'Pago';
+          const isVencida = conta.status !== 'Pago' && vencimento < hoje;
 
-        if (isPago) {
-          totalPago += conta.valor_total || 0;
-          contasPagas++;
-        } else if (isVencida) {
-          totalVencido += conta.saldo || 0;
-          contasVencidas++;
-        } else {
-          totalPendente += conta.saldo || 0;
-          contasPendentes++;
+          if (isPago) {
+            totalPago += Number(conta.valor_total) || 0;
+            contasPagas++;
+          } else if (isVencida) {
+            totalVencido += Number(conta.saldo) || 0;
+            contasVencidas++;
+          } else {
+            totalPendente += Number(conta.saldo) || 0;
+            contasPendentes++;
+          }
+        } catch (error) {
+          console.error('Erro ao processar conta:', conta.id, error);
         }
       });
 
@@ -114,6 +118,15 @@ export const Relatorios = ({ selectedEmpresa }: RelatoriosProps) => {
     } catch (error) {
       console.error("Erro inesperado:", error);
       toast.error("Erro inesperado ao carregar relatórios");
+      setContas([]);
+      setResumoFinanceiro({
+        totalPago: 0,
+        totalPendente: 0,
+        totalVencido: 0,
+        contasPagas: 0,
+        contasPendentes: 0,
+        contasVencidas: 0
+      });
     } finally {
       setLoading(false);
     }
