@@ -37,69 +37,84 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
   const fimSemana = format(new Date(agoraSP.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
 
   // Query para Total Hoje
-  const { data: totalHoje = 0 } = useQuery({
+  const { data: totalHoje = 0, isLoading: loadingHoje } = useQuery({
     queryKey: ['totalHoje', selectedEmpresa, hoje],
     queryFn: async () => {
+      const inicio = performance.now();
       const { data, error } = await supabase.rpc('rpc_total_contas_do_dia', {
         p_empresa: selectedEmpresa,
         p_data: hoje,
       });
+      const fim = performance.now();
+      console.log(`⚡ rpc_total_contas_do_dia: ${(fim - inicio).toFixed(2)}ms`);
       if (error) throw error;
       return Number(data) || 0;
     },
   });
 
   // Query para Próxima Semana
-  const { data: proximaSemana = 0 } = useQuery({
+  const { data: proximaSemana = 0, isLoading: loadingSemana } = useQuery({
     queryKey: ['proximaSemana', selectedEmpresa, inicioSemana, fimSemana],
     queryFn: async () => {
+      const inicio = performance.now();
       const { data, error } = await supabase.rpc('rpc_total_proxima_semana', {
         p_empresa: selectedEmpresa,
         p_data_inicio: inicioSemana,
         p_data_fim: fimSemana,
       });
+      const fim = performance.now();
+      console.log(`⚡ rpc_total_proxima_semana: ${(fim - inicio).toFixed(2)}ms`);
       if (error) throw error;
       return Number(data) || 0;
     },
   });
 
   // Query para Mês Atual
-  const { data: mesAtual = 0 } = useQuery({
+  const { data: mesAtual = 0, isLoading: loadingMes } = useQuery({
     queryKey: ['mesAtual', selectedEmpresa, inicioMes, fimMes],
     queryFn: async () => {
+      const inicio = performance.now();
       const { data, error } = await supabase.rpc('rpc_total_mes_atual', {
         p_empresa: selectedEmpresa,
         p_data_inicio: inicioMes,
         p_data_fim: fimMes,
       });
+      const fim = performance.now();
+      console.log(`⚡ rpc_total_mes_atual: ${(fim - inicio).toFixed(2)}ms`);
       if (error) throw error;
       return Number(data) || 0;
     },
   });
 
   // Query para Resumo (contadores)
-  const { data: resumo } = useQuery<DashboardResumo>({
+  const { data: resumo, isLoading: loadingResumo } = useQuery<DashboardResumo>({
     queryKey: ['dashboardResumo', selectedEmpresa, hoje, inicioMes, fimMes],
     queryFn: async () => {
+      const inicio = performance.now();
       const { data, error } = await supabase.rpc('rpc_dashboard_resumo', {
         p_empresa: selectedEmpresa,
         p_hoje: hoje,
         p_inicio_mes: inicioMes,
         p_fim_mes: fimMes,
       });
+      const fim = performance.now();
+      console.log(`⚡ rpc_dashboard_resumo: ${(fim - inicio).toFixed(2)}ms`);
       if (error) throw error;
       return data[0] || { contas_vencidas: 0, contas_pendentes: 0, contas_pagas_mes: 0 };
     },
   });
 
   // Query para Contas Próximas
-  const { data: contasProximas = [] } = useQuery<ContaProxima[]>({
+  const { data: contasProximas = [], isLoading: loadingProximas } = useQuery<ContaProxima[]>({
     queryKey: ['contasProximas', selectedEmpresa, hoje],
     queryFn: async () => {
+      const inicio = performance.now();
       const { data, error } = await supabase.rpc('rpc_contas_proximas', {
         p_empresa: selectedEmpresa,
         p_hoje: hoje,
       });
+      const fim = performance.now();
+      console.log(`⚡ rpc_contas_proximas: ${(fim - inicio).toFixed(2)}ms`);
       if (error) throw error;
       return data || [];
     },
@@ -117,8 +132,21 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
     return nomes[id] || id;
   };
 
+  // Loading state global
+  const isLoading = loadingHoje || loadingSemana || loadingMes || loadingResumo || loadingProximas;
+
   return (
     <div className="space-y-8 p-6">
+      {/* Loading overlay suave */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-sm text-muted-foreground">Carregando dashboard...</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard Financeiro</h1>

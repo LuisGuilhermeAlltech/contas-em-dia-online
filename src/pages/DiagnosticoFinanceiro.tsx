@@ -15,6 +15,7 @@ interface ContaDiagnostico {
   id: string;
   descricao: string;
   valor_total: number;
+  saldo: number;
   vencimento: string;
   status: string;
   empresa: string;
@@ -54,29 +55,28 @@ export default function DiagnosticoFinanceiro() {
 
       console.log(`🔍 Diagnóstico para ${dataFormatada} (${startISO} até ${endISO})`);
 
-      // TESTE 1: SQL Direto
+      // TESTE 1: SQL Direto (agora usando SALDO e status IN ('Pendente', 'Parcial'))
       const { data: contasSQL, error: errorSQL } = await supabase
         .from('contas_view')
-        .select('id, descricao, valor_total, vencimento, status, empresa')
+        .select('id, descricao, valor_total, saldo, vencimento, status, empresa')
         .eq('empresa', selectedEmpresa);
 
       if (errorSQL) {
         console.error("Erro SQL direto:", errorSQL);
       }
 
-      // Filtrar no client para diagnóstico detalhado
-      const contasPendentes = (contasSQL || []).filter(c => {
+      // Filtrar no client para diagnóstico detalhado (usando mesma regra das RPCs)
+      const contasEmAberto = (contasSQL || []).filter(c => {
         if (!c.vencimento) return false;
-        const vencimentoISO = new Date(c.vencimento + 'T00:00:00').toISOString();
-        return vencimentoISO >= startISO && 
-               vencimentoISO < endISO && 
-               c.status === 'Pendente';
+        const vencimentoDate = c.vencimento;
+        return vencimentoDate === dataFormatada && 
+               (c.status === 'Pendente' || c.status === 'Parcial');
       });
 
-      const somaSQL = contasPendentes.reduce((acc, c) => acc + Number(c.valor_total || 0), 0);
+      const somaSQL = contasEmAberto.reduce((acc, c) => acc + Number(c.saldo || 0), 0);
 
       setResultadoSQL({
-        contas: contasPendentes as ContaDiagnostico[],
+        contas: contasEmAberto as ContaDiagnostico[],
         soma: somaSQL
       });
 
@@ -98,25 +98,18 @@ export default function DiagnosticoFinanceiro() {
       
       const contasPagas = todasContas.filter(c => {
         if (!c.vencimento) return false;
-        const vencimentoISO = new Date(c.vencimento + 'T00:00:00').toISOString();
-        return vencimentoISO >= startISO && 
-               vencimentoISO < endISO && 
-               c.status === 'Pago';
+        return c.vencimento === dataFormatada && c.status === 'Pago';
       });
 
       const contasCanceladas = todasContas.filter(c => {
         if (!c.vencimento) return false;
-        const vencimentoISO = new Date(c.vencimento + 'T00:00:00').toISOString();
-        return vencimentoISO >= startISO && 
-               vencimentoISO < endISO && 
-               c.status === 'Cancelada';
+        return c.vencimento === dataFormatada && c.status === 'Cancelada';
       });
 
       const contasForaIntervalo = todasContas.filter(c => {
         if (!c.vencimento) return false;
-        const vencimentoISO = new Date(c.vencimento + 'T00:00:00').toISOString();
-        return (vencimentoISO < startISO || vencimentoISO >= endISO) && 
-               c.status === 'Pendente';
+        return c.vencimento !== dataFormatada && 
+               (c.status === 'Pendente' || c.status === 'Parcial');
       });
 
       setDiferenças({
@@ -325,9 +318,14 @@ export default function DiagnosticoFinanceiro() {
                           Vencimento: {formatDate(conta.vencimento)} | Status: {conta.status}
                         </p>
                       </div>
-                      <p className="font-bold text-gray-900">
-                        R$ {formatCurrency(conta.valor_total)}
-                      </p>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-900">
+                          R$ {formatCurrency(conta.saldo)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Total: R$ {formatCurrency(conta.valor_total)}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
