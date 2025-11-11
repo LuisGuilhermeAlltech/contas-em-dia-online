@@ -42,6 +42,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
   });
   const [multiDatesEnabled, setMultiDatesEnabled] = useState(false);
   const [vencimentosMultiplos, setVencimentosMultiplos] = useState<string[]>([""]);
+  const [dataInicial, setDataInicial] = useState("");
 
   const [pagamentoData, setPagamentoData] = useState({
     valor: ""
@@ -139,6 +140,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
         vencimento: "",
       });
       setVencimentosMultiplos([""]);
+      setDataInicial("");
       setMultiDatesEnabled(false);
       setIsDialogOpen(false);
       
@@ -499,6 +501,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                       <Input
                         id="data-inicial"
                         type="date"
+                        value={dataInicial}
+                        onChange={(e) => setDataInicial(e.target.value)}
                         placeholder="Selecione a data inicial"
                       />
                     </div>
@@ -506,9 +510,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                       type="button"
                       variant="secondary"
                       className="mt-6"
-                      onClick={(e) => {
-                        const input = (e.currentTarget.previousElementSibling as HTMLDivElement)?.querySelector('input');
-                        const dataInicial = input?.value;
+                      onClick={() => {
                         if (!dataInicial) {
                           toast({
                             title: "Data necessária",
@@ -536,7 +538,7 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   </div>
                   <Label>Datas de Vencimento (máx. 12)</Label>
                   {vencimentosMultiplos.slice(0, 12).map((data, idx) => (
-                    <div key={idx} className="flex gap-2 mt-2">
+                    <div key={`vencimento-${idx}-${data}`} className="flex gap-2 mt-2">
                       <Input
                         type="date"
                         value={data}
@@ -675,8 +677,8 @@ export const ContasAPagar = ({ selectedEmpresa }: ContasAPagarProps) => {
                   <p className="text-gray-500 text-center py-4">Nenhum pagamento encontrado</p>
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {historicoPagamentos.map((pagamento, index) => (
-                      <div key={pagamento.id || index} className="flex justify-between items-center p-3 bg-white border rounded">
+                    {historicoPagamentos.map((pagamento) => (
+                      <div key={pagamento.id} className="flex justify-between items-center p-3 bg-white border rounded">
                         <div>
                           <span className="text-sm text-gray-600">
                             {formatDate(pagamento.data)}
