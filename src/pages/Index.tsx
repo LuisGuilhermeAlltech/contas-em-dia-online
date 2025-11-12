@@ -3,44 +3,30 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Dashboard } from "@/components/Dashboard";
 import { ContasAPagar } from "@/components/ContasAPagar";
-import { Fornecedores } from "@/components/Fornecedores";
 import { Relatorios } from "@/components/Relatorios";
-import { OfflineInstaller } from "@/components/OfflineInstaller";
-import { OfflineStatus } from "@/components/OfflineStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
-import { Menu, Download } from "lucide-react";
+import { Menu } from "lucide-react";
 
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedEmpresa, setSelectedEmpresa] = useState("grupo-lider");
+  const [selectedEmpresa, setSelectedEmpresa] = useState("alltech-matriz");
 
   const renderContent = () => {
-    console.log('Renderizando conteúdo para menu:', activeMenu);
-    
-    try {
-      switch (activeMenu) {
-        case "dashboard":
-          return <Dashboard selectedEmpresa={selectedEmpresa} />;
-        case "contas":
-          return (
-            <ErrorBoundary>
-              <ContasAPagar selectedEmpresa={selectedEmpresa} />
-            </ErrorBoundary>
-          );
-        case "fornecedores":
-          return <Fornecedores selectedEmpresa={selectedEmpresa} />;
-        case "relatorios":
-          return <Relatorios selectedEmpresa={selectedEmpresa} />;
-        case "instalador":
-          return <OfflineInstaller />;
-        default:
-          return <Dashboard selectedEmpresa={selectedEmpresa} />;
-      }
-    } catch (error) {
-      console.error('Erro ao renderizar conteúdo:', error);
-      return <div>Erro ao carregar conteúdo</div>;
+    switch (activeMenu) {
+      case "dashboard":
+        return <Dashboard selectedEmpresa={selectedEmpresa} />;
+      case "contas":
+        return (
+          <ErrorBoundary>
+            <ContasAPagar selectedEmpresa={selectedEmpresa} />
+          </ErrorBoundary>
+        );
+      case "relatorios":
+        return <Relatorios selectedEmpresa={selectedEmpresa} />;
+      default:
+        return <Dashboard selectedEmpresa={selectedEmpresa} />;
     }
   };
 
@@ -70,18 +56,6 @@ const Index = () => {
               <h1 className="text-2xl font-bold text-gray-900">
                 Sistema de Controle Financeiro
               </h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveMenu("instalador")}
-                className="flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Instalar App
-              </Button>
-              <OfflineStatus />
             </div>
           </div>
         </header>

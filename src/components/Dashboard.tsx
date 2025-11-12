@@ -25,8 +25,8 @@ type DashboardResumo = {
 };
 
 export function Dashboard({ selectedEmpresa }: DashboardProps) {
-  // Calcular datas no timezone de São Paulo
-  const timeZone = "America/Sao_Paulo";
+  // Calcular datas no timezone de Fortaleza
+  const timeZone = "America/Fortaleza";
   const agoraUTC = new Date();
   const agoraSP = toZonedTime(agoraUTC, timeZone);
   
@@ -172,12 +172,11 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
 
   const getNomeEmpresa = (id: string) => {
     const nomes: Record<string, string> = {
-      "lider": "Líder",
-      "lider-postos": "Líder Postos",
-      "liderbag": "Lider Bag",
-      "lg-caminhoes": "LG Caminhões",
-      "lg-veiculos": "LG Veículos",
-      "lg-seminovos": "LG Seminovos"
+      "alltech-matriz": "AllTech Matriz",
+      "alltech-filial": "AllTech Filial",
+      "grupo-lider": "Grupo Líder",
+      "adryssia-cortez": "Adryssia Cortez",
+      "luis-guilherme": "Luis Guilherme"
     };
     return nomes[id] || id;
   };
