@@ -35,7 +35,7 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
 
   return (
     <PortalProvider companyId={selectedCompanyId}>
-      <div className="min-h-screen bg-background flex">
+      <div className="min-h-screen bg-background flex notranslate" translate="no">
         {/* Sidebar */}
         <aside
           className={`fixed left-0 top-0 z-40 h-screen transition-all duration-300 bg-card border-r ${
@@ -60,16 +60,16 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
             {sidebarOpen && (
               <div className="p-4 border-b">
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Empresa
+                  <span className="notranslate" translate="no">Empresa</span>
                 </label>
                 <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full notranslate" translate="no">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="notranslate" translate="no">
                     {Object.entries(COMPANIES).map(([id, name]) => (
                       <SelectItem key={id} value={id}>
-                        {name}
+                        <span className="notranslate" translate="no">{name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -104,7 +104,7 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
                 Sistema de Controle Financeiro
               </h2>
               <div className="text-sm text-muted-foreground">
-                {selectedCompanyName}
+                <span className="notranslate" translate="no">{selectedCompanyName}</span>
               </div>
             </div>
           </header>

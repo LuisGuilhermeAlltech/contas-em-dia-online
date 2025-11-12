@@ -103,3 +103,7 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+.notranslate {
+  unicode-bidi: plaintext;
+}
