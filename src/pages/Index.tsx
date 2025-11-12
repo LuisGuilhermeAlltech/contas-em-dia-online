@@ -1,9 +1,9 @@
 
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { Dashboard } from "@/components/Dashboard";
-import { ContasAPagar } from "@/components/ContasAPagar";
-import { Relatorios } from "@/components/Relatorios";
+import { DashboardNovo } from "@/components/DashboardNovo";
+import { ContasAPagarNovo } from "@/components/ContasAPagarNovo";
+import { RelatoriosNovo } from "@/components/RelatoriosNovo";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
@@ -11,29 +11,22 @@ import { Menu } from "lucide-react";
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedEmpresa, setSelectedEmpresa] = useState("grupo-lider");
+  const [selectedEmpresa, setSelectedEmpresa] = useState("alltech-matriz");
 
   const renderContent = () => {
-    console.log('Renderizando conteúdo para menu:', activeMenu);
-    
-    try {
-      switch (activeMenu) {
-        case "dashboard":
-          return <Dashboard selectedEmpresa={selectedEmpresa} />;
-        case "contas":
-          return (
-            <ErrorBoundary>
-              <ContasAPagar selectedEmpresa={selectedEmpresa} />
-            </ErrorBoundary>
-          );
-        case "relatorios":
-          return <Relatorios selectedEmpresa={selectedEmpresa} />;
-        default:
-          return <Dashboard selectedEmpresa={selectedEmpresa} />;
-      }
-    } catch (error) {
-      console.error('Erro ao renderizar conteúdo:', error);
-      return <div>Erro ao carregar conteúdo</div>;
+    switch (activeMenu) {
+      case "dashboard":
+        return <DashboardNovo selectedEmpresa={selectedEmpresa} />;
+      case "contas":
+        return (
+          <ErrorBoundary>
+            <ContasAPagarNovo selectedEmpresa={selectedEmpresa} />
+          </ErrorBoundary>
+        );
+      case "relatorios":
+        return <RelatoriosNovo selectedEmpresa={selectedEmpresa} />;
+      default:
+        return <DashboardNovo selectedEmpresa={selectedEmpresa} />;
     }
   };
 

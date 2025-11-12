@@ -34,6 +34,8 @@ export const Sidebar = ({
   ];
 
   const empresas = [
+    { id: "alltech-matriz", name: "AllTech Matriz" },
+    { id: "alltech-filial", name: "AllTech Filial" },
     { id: "grupo-lider", name: "Grupo Líder" },
     { id: "adryssia-cortez", name: "Adryssia Cortez" },
   ];
