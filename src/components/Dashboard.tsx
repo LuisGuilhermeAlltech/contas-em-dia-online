@@ -172,8 +172,12 @@ export function Dashboard({ selectedEmpresa }: DashboardProps) {
 
   const getNomeEmpresa = (id: string) => {
     const nomes: Record<string, string> = {
-      "grupo-lider": "Grupo Líder",
-      "adryssia-cortez": "Adryssia Cortez",
+      "lider": "Líder",
+      "lider-postos": "Líder Postos",
+      "liderbag": "Lider Bag",
+      "lg-caminhoes": "LG Caminhões",
+      "lg-veiculos": "LG Veículos",
+      "lg-seminovos": "LG Seminovos"
     };
     return nomes[id] || id;
   };
