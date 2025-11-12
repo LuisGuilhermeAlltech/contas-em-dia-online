@@ -3,13 +3,10 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Dashboard } from "@/components/Dashboard";
 import { ContasAPagar } from "@/components/ContasAPagar";
-import { Fornecedores } from "@/components/Fornecedores";
 import { Relatorios } from "@/components/Relatorios";
-import { OfflineInstaller } from "@/components/OfflineInstaller";
-import { OfflineStatus } from "@/components/OfflineStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
-import { Menu, Download } from "lucide-react";
+import { Menu } from "lucide-react";
 
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
@@ -29,12 +26,8 @@ const Index = () => {
               <ContasAPagar selectedEmpresa={selectedEmpresa} />
             </ErrorBoundary>
           );
-        case "fornecedores":
-          return <Fornecedores selectedEmpresa={selectedEmpresa} />;
         case "relatorios":
           return <Relatorios selectedEmpresa={selectedEmpresa} />;
-        case "instalador":
-          return <OfflineInstaller />;
         default:
           return <Dashboard selectedEmpresa={selectedEmpresa} />;
       }
@@ -68,20 +61,8 @@ const Index = () => {
                 <Menu className="h-5 w-5" />
               </Button>
               <h1 className="text-2xl font-bold text-gray-900">
-                Sistema de Controle Financeiro
+                Contas em Dia - Gestão Financeira
               </h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveMenu("instalador")}
-                className="flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Instalar App
-              </Button>
-              <OfflineStatus />
             </div>
           </div>
         </header>

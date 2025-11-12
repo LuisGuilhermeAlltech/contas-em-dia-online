@@ -4,15 +4,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   LayoutDashboard, 
   CreditCard, 
-  Users, 
   FileText, 
   Building2,
   ChevronLeft,
   ChevronRight,
-  Download,
-  Stethoscope
 } from "lucide-react";
-import { Link } from "react-router-dom";
 
 interface SidebarProps {
   activeMenu: string;
@@ -34,16 +30,12 @@ export const Sidebar = ({
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "contas", label: "Contas a Pagar", icon: CreditCard },
-    { id: "fornecedores", label: "Fornecedores", icon: Users },
     { id: "relatorios", label: "Relatórios", icon: FileText },
-    { id: "instalador", label: "Instalador Offline", icon: Download },
   ];
 
   const empresas = [
-    { id: "grupo-lider", name: "Grupo Lider" },
-    { id: "alltech-matriz", name: "Alltech Matriz" },
-    { id: "alltech-filial", name: "Alltech Filial" },
-    { id: "luis-guilherme", name: "Luis Guilherme" },
+    { id: "grupo-lider", name: "Grupo Líder" },
+    { id: "adryssia-cortez", name: "Adryssia Cortez" },
   ];
 
   return (
@@ -110,23 +102,6 @@ export const Sidebar = ({
               </li>
             );
           })}
-          
-          {/* Diagnóstico Financeiro - visível apenas em modo edição */}
-          {process.env.NODE_ENV !== 'production' && (
-            <li className="pt-4 border-t border-gray-200">
-              <Link to="/relatorios/diagnostico">
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start h-12 ${
-                    !sidebarOpen ? 'px-3' : 'px-4'
-                  } text-orange-600 hover:bg-orange-50`}
-                >
-                  <Stethoscope className="h-5 w-5" />
-                  {sidebarOpen && <span className="ml-3 text-sm">Diagnóstico</span>}
-                </Button>
-              </Link>
-            </li>
-          )}
         </ul>
       </nav>
     </div>
