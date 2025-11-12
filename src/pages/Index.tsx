@@ -1,18 +1,20 @@
 
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { DashboardNovo } from "@/components/DashboardNovo";
-import { ContasAPagarNovo } from "@/components/ContasAPagarNovo";
-import { ContasAdryssia } from "@/components/ContasAdryssia";
-import { RelatoriosNovo } from "@/components/RelatoriosNovo";
+import { Dashboard } from "@/components/Dashboard";
+import { ContasAPagar } from "@/components/ContasAPagar";
+import { Fornecedores } from "@/components/Fornecedores";
+import { Relatorios } from "@/components/Relatorios";
+import { OfflineInstaller } from "@/components/OfflineInstaller";
+import { OfflineStatus } from "@/components/OfflineStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
-import { Menu } from "lucide-react";
+import { Menu, Download } from "lucide-react";
 
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedEmpresa, setSelectedEmpresa] = useState("d0f7e8c5-7d49-438e-bc8f-9fb3b4e31e64");
+  const [selectedEmpresa, setSelectedEmpresa] = useState("grupo-lider");
 
   const renderContent = () => {
     console.log('Renderizando conteúdo para menu:', activeMenu);
@@ -20,23 +22,21 @@ const Index = () => {
     try {
       switch (activeMenu) {
         case "dashboard":
-          return <DashboardNovo selectedEmpresa={selectedEmpresa} />;
+          return <Dashboard selectedEmpresa={selectedEmpresa} />;
         case "contas":
           return (
             <ErrorBoundary>
-              <ContasAPagarNovo selectedEmpresa={selectedEmpresa} />
+              <ContasAPagar selectedEmpresa={selectedEmpresa} />
             </ErrorBoundary>
           );
-        case "adryssia":
-          return (
-            <ErrorBoundary>
-              <ContasAdryssia selectedEmpresa={selectedEmpresa} />
-            </ErrorBoundary>
-          );
+        case "fornecedores":
+          return <Fornecedores selectedEmpresa={selectedEmpresa} />;
         case "relatorios":
-          return <RelatoriosNovo selectedEmpresa={selectedEmpresa} />;
+          return <Relatorios selectedEmpresa={selectedEmpresa} />;
+        case "instalador":
+          return <OfflineInstaller />;
         default:
-          return <DashboardNovo selectedEmpresa={selectedEmpresa} />;
+          return <Dashboard selectedEmpresa={selectedEmpresa} />;
       }
     } catch (error) {
       console.error('Erro ao renderizar conteúdo:', error);
@@ -72,7 +72,16 @@ const Index = () => {
               </h1>
             </div>
             <div className="flex items-center gap-4">
-              {/* Header actions removidos para simplificar */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveMenu("instalador")}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Instalar App
+              </Button>
+              <OfflineStatus />
             </div>
           </div>
         </header>

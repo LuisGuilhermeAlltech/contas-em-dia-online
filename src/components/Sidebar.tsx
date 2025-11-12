@@ -34,13 +34,16 @@ export const Sidebar = ({
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "contas", label: "Contas a Pagar", icon: CreditCard },
-    { id: "adryssia", label: "Contas — Adryssia Cortez", icon: Users },
+    { id: "fornecedores", label: "Fornecedores", icon: Users },
     { id: "relatorios", label: "Relatórios", icon: FileText },
+    { id: "instalador", label: "Instalador Offline", icon: Download },
   ];
 
   const empresas = [
-    { id: "d0f7e8c5-7d49-438e-bc8f-9fb3b4e31e64", name: "Luis Guilherme" },
-    { id: "b4e31e64-9fb3-438e-bc8f-d0f7e8c57d49", name: "Adryssia Cortez" },
+    { id: "grupo-lider", name: "Grupo Lider" },
+    { id: "alltech-matriz", name: "Alltech Matriz" },
+    { id: "alltech-filial", name: "Alltech Filial" },
+    { id: "luis-guilherme", name: "Luis Guilherme" },
   ];
 
   return (
@@ -52,7 +55,7 @@ export const Sidebar = ({
           {sidebarOpen && (
             <div className="flex items-center gap-2">
               <Building2 className="h-8 w-8 text-blue-600" />
-              <span className="font-bold text-lg text-gray-900">Contas em Dia</span>
+              <span className="font-bold text-lg text-gray-900">Contas Pro Grupo L.G</span>
             </div>
           )}
           <Button
@@ -107,6 +110,23 @@ export const Sidebar = ({
               </li>
             );
           })}
+          
+          {/* Diagnóstico Financeiro - visível apenas em modo edição */}
+          {process.env.NODE_ENV !== 'production' && (
+            <li className="pt-4 border-t border-gray-200">
+              <Link to="/relatorios/diagnostico">
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start h-12 ${
+                    !sidebarOpen ? 'px-3' : 'px-4'
+                  } text-orange-600 hover:bg-orange-50`}
+                >
+                  <Stethoscope className="h-5 w-5" />
+                  {sidebarOpen && <span className="ml-3 text-sm">Diagnóstico</span>}
+                </Button>
+              </Link>
+            </li>
+          )}
         </ul>
       </nav>
     </div>
