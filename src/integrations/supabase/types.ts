@@ -17,32 +17,64 @@ export type Database = {
       contas: {
         Row: {
           created_at: string | null
+          data_emissao: string | null
+          deleted_at: string | null
+          desconto: number | null
           descricao: string
           empresa: string
+          fornecedor_id: string | null
           id: string
+          juros: number | null
+          multa: number | null
+          observacoes: string | null
+          responsavel: string | null
           total_pago: number | null
           valor_total: number
           vencimento: string
         }
         Insert: {
           created_at?: string | null
+          data_emissao?: string | null
+          deleted_at?: string | null
+          desconto?: number | null
           descricao: string
           empresa: string
+          fornecedor_id?: string | null
           id?: string
+          juros?: number | null
+          multa?: number | null
+          observacoes?: string | null
+          responsavel?: string | null
           total_pago?: number | null
           valor_total: number
           vencimento: string
         }
         Update: {
           created_at?: string | null
+          data_emissao?: string | null
+          deleted_at?: string | null
+          desconto?: number | null
           descricao?: string
           empresa?: string
+          fornecedor_id?: string | null
           id?: string
+          juros?: number | null
+          multa?: number | null
+          observacoes?: string | null
+          responsavel?: string | null
           total_pago?: number | null
           valor_total?: number
           vencimento?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contas_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fornecedores: {
         Row: {
@@ -73,21 +105,27 @@ export type Database = {
           conta_id: string
           created_at: string | null
           data: string
+          forma: string | null
           id: string
+          observacao: string | null
           valor: number
         }
         Insert: {
           conta_id: string
           created_at?: string | null
           data: string
+          forma?: string | null
           id?: string
+          observacao?: string | null
           valor: number
         }
         Update: {
           conta_id?: string
           created_at?: string | null
           data?: string
+          forma?: string | null
           id?: string
+          observacao?: string | null
           valor?: number
         }
         Relationships: [
@@ -103,6 +141,13 @@ export type Database = {
             columns: ["conta_id"]
             isOneToOne: false
             referencedRelation: "contas_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagamentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "v_contas_pagar"
             referencedColumns: ["id"]
           },
         ]
@@ -124,8 +169,98 @@ export type Database = {
         }
         Relationships: []
       }
+      v_contas_pagar: {
+        Row: {
+          created_at: string | null
+          data_emissao: string | null
+          data_vencimento: string | null
+          deleted_at: string | null
+          desconto: number | null
+          descricao: string | null
+          empresa_id: string | null
+          fornecedor_id: string | null
+          id: string | null
+          juros: number | null
+          multa: number | null
+          observacoes: string | null
+          responsavel: string | null
+          status_calc: string | null
+          valor_aberto: number | null
+          valor_original: number | null
+          valor_pago_total: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_emissao?: string | null
+          data_vencimento?: string | null
+          deleted_at?: string | null
+          desconto?: number | null
+          descricao?: string | null
+          empresa_id?: never
+          fornecedor_id?: string | null
+          id?: string | null
+          juros?: number | null
+          multa?: number | null
+          observacoes?: string | null
+          responsavel?: string | null
+          status_calc?: never
+          valor_aberto?: never
+          valor_original?: number | null
+          valor_pago_total?: never
+        }
+        Update: {
+          created_at?: string | null
+          data_emissao?: string | null
+          data_vencimento?: string | null
+          deleted_at?: string | null
+          desconto?: number | null
+          descricao?: string | null
+          empresa_id?: never
+          fornecedor_id?: string | null
+          id?: string | null
+          juros?: number | null
+          multa?: number | null
+          observacoes?: string | null
+          responsavel?: string | null
+          status_calc?: never
+          valor_aberto?: never
+          valor_original?: number | null
+          valor_pago_total?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contas_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      fn_proximas_contas: {
+        Args: { p_empresa: string; p_limite?: number }
+        Returns: {
+          data_vencimento: string
+          descricao: string
+          fornecedor: string
+          id: string
+          status_calc: string
+          valor_aberto: number
+        }[]
+      }
+      fn_resumo_cp: {
+        Args: { p_empresa: string; p_ref?: string }
+        Returns: {
+          qtd_pagas_mes: number
+          qtd_pendentes: number
+          qtd_vencidas: number
+          total_hoje: number
+          total_mes_atual: number
+          total_prox_semana: number
+        }[]
+      }
       rpc_contas_proximas: {
         Args: { p_empresa: string; p_hoje: string }
         Returns: {
