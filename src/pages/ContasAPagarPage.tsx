@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAppStore } from '@/store/appStore';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { toast } from 'sonner';
+import MultiVencimentosForm, { Vencimento } from '@/components/contas/MultiVencimentosForm';
 
 export default function ContasAPagarPage() {
   const queryClient = useQueryClient();
@@ -41,6 +42,7 @@ export default function ContasAPagarPage() {
     valor_original: '',
     data_vencimento: '',
   });
+  const [vencimentos, setVencimentos] = useState<Vencimento[]>([]);
   const [dialogNova, setDialogNova] = useState(false);
 
   const [pagamentoDialog, setPagamentoDialog] = useState(false);
@@ -127,21 +129,49 @@ export default function ContasAPagarPage() {
   // Mutation: criar conta
   const criarContaMutation = useMutation({
     mutationFn: async (dados: any) => {
-      const { error } = await supabase.from('contas').insert({
-        descricao: dados.descricao,
-        valor_total: Number(dados.valor_original),
-        vencimento: dados.data_vencimento,
-        empresa: selectedCompanyId,
-        total_pago: 0,
-      });
-      if (error) throw error;
+      // Se há múltiplos vencimentos
+      if (dados.vencimentos && dados.vencimentos.length > 1) {
+        const grupoId = crypto.randomUUID();
+        const contasParaInserir = dados.vencimentos.map((venc: Vencimento) => ({
+          descricao: dados.descricao,
+          valor_total: Number(dados.valor_original),
+          vencimento: venc.data,
+          empresa: selectedCompanyId,
+          total_pago: 0,
+          parcela_numero: venc.parcela,
+          total_parcelas: dados.vencimentos.length,
+          grupo_parcela_id: grupoId,
+        }));
+
+        const { error } = await supabase.from('contas').insert(contasParaInserir);
+        if (error) throw error;
+      } else {
+        // Vencimento único
+        const { error } = await supabase.from('contas').insert({
+          descricao: dados.descricao,
+          valor_total: Number(dados.valor_original),
+          vencimento: dados.data_vencimento,
+          empresa: selectedCompanyId,
+          total_pago: 0,
+          parcela_numero: 1,
+          total_parcelas: 1,
+          grupo_parcela_id: null,
+        });
+        if (error) throw error;
+      }
     },
-    onSuccess: () => {
-      toast.success('Conta criada com sucesso');
+    onSuccess: (_data, variables) => {
+      const quantidade = variables.vencimentos?.length || 1;
+      if (quantidade > 1) {
+        toast.success(`${quantidade} contas criadas com sucesso`);
+      } else {
+        toast.success('Conta criada com sucesso');
+      }
       queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo', selectedCompanyId] });
       setDialogNova(false);
       setNovaConta({ descricao: '', valor_original: '', data_vencimento: '' });
+      setVencimentos([]);
     },
     onError: () => {
       toast.error('Erro ao criar conta');
@@ -216,11 +246,28 @@ export default function ContasAPagarPage() {
   });
 
   const handleCriarConta = () => {
-    if (!novaConta.descricao || !novaConta.valor_original || !novaConta.data_vencimento) {
-      toast.error('Preencha todos os campos');
+    // Validação básica
+    if (!novaConta.descricao || !novaConta.valor_original) {
+      toast.error('Preencha descrição e valor');
       return;
     }
-    criarContaMutation.mutate(novaConta);
+
+    // Se há múltiplos vencimentos, validá-los
+    if (vencimentos.length > 1) {
+      const vencimentosInvalidos = vencimentos.some(v => !v.data);
+      if (vencimentosInvalidos) {
+        toast.error('Todas as datas de vencimento devem ser preenchidas');
+        return;
+      }
+      criarContaMutation.mutate({ ...novaConta, vencimentos });
+    } else {
+      // Vencimento único
+      if (!novaConta.data_vencimento) {
+        toast.error('Preencha a data de vencimento');
+        return;
+      }
+      criarContaMutation.mutate(novaConta);
+    }
   };
 
   const handlePagar = (conta: any) => {
@@ -305,7 +352,7 @@ export default function ContasAPagarPage() {
               Nova Conta
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Criar Nova Conta</DialogTitle>
             </DialogHeader>
@@ -315,6 +362,7 @@ export default function ContasAPagarPage() {
                 <Input
                   value={novaConta.descricao}
                   onChange={(e) => setNovaConta({ ...novaConta, descricao: e.target.value })}
+                  placeholder="Ex: Aluguel, Fornecedor X, etc."
                 />
               </div>
               <div>
@@ -326,21 +374,39 @@ export default function ContasAPagarPage() {
                   onChange={(e) =>
                     setNovaConta({ ...novaConta, valor_original: e.target.value })
                   }
+                  placeholder="0.00"
                 />
               </div>
-              <div>
-                <Label>Vencimento</Label>
-                <Input
-                  type="date"
-                  value={novaConta.data_vencimento}
-                  onChange={(e) =>
-                    setNovaConta({ ...novaConta, data_vencimento: e.target.value })
-                  }
+
+              {/* Campo de vencimento único - só aparece se não há múltiplos vencimentos */}
+              {vencimentos.length <= 1 && (
+                <div>
+                  <Label>Vencimento</Label>
+                  <Input
+                    type="date"
+                    value={novaConta.data_vencimento}
+                    onChange={(e) =>
+                      setNovaConta({ ...novaConta, data_vencimento: e.target.value })
+                    }
+                  />
+                </div>
+              )}
+
+              {/* Seção de múltiplos vencimentos */}
+              <div className="pt-4">
+                <h3 className="text-sm font-medium mb-3">Repetição / Parcelas (opcional)</h3>
+                <MultiVencimentosForm 
+                  onVencimentosChange={setVencimentos}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleCriarConta}>Criar</Button>
+              <Button 
+                onClick={handleCriarConta}
+                disabled={criarContaMutation.isPending}
+              >
+                {criarContaMutation.isPending ? 'Criando...' : 'Criar'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

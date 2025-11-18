@@ -23,12 +23,15 @@ export type Database = {
           descricao: string
           empresa: string
           fornecedor_id: string | null
+          grupo_parcela_id: string | null
           id: string
           juros: number | null
           multa: number | null
           observacoes: string | null
+          parcela_numero: number | null
           responsavel: string | null
           total_pago: number | null
+          total_parcelas: number | null
           valor_total: number
           vencimento: string
         }
@@ -40,12 +43,15 @@ export type Database = {
           descricao: string
           empresa: string
           fornecedor_id?: string | null
+          grupo_parcela_id?: string | null
           id?: string
           juros?: number | null
           multa?: number | null
           observacoes?: string | null
+          parcela_numero?: number | null
           responsavel?: string | null
           total_pago?: number | null
+          total_parcelas?: number | null
           valor_total: number
           vencimento: string
         }
@@ -57,12 +63,15 @@ export type Database = {
           descricao?: string
           empresa?: string
           fornecedor_id?: string | null
+          grupo_parcela_id?: string | null
           id?: string
           juros?: number | null
           multa?: number | null
           observacoes?: string | null
+          parcela_numero?: number | null
           responsavel?: string | null
           total_pago?: number | null
+          total_parcelas?: number | null
           valor_total?: number
           vencimento?: string
         }
