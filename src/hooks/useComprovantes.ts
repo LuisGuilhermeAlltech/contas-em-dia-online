@@ -33,17 +33,21 @@ export function useComprovantes() {
         throw new Error(uploadError.message);
       }
 
-      // Obter URL pública
-      const { data: urlData } = supabase.storage
+      // Obter signed URL (bucket privado)
+      const { data: urlData, error: urlError } = await supabase.storage
         .from('comprovantes-boletos')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 ano de validade
 
-      // Registrar na tabela (usando rpc ou insert direto)
+      if (urlError || !urlData?.signedUrl) {
+        throw new Error('Erro ao gerar URL do arquivo');
+      }
+
+      // Registrar na tabela
       const { error: insertError } = await (supabase as any)
         .from('comprovantes_pagamento')
         .insert({
           pagamento_id: pagamentoId,
-          arquivo_url: urlData.publicUrl,
+          arquivo_url: urlData.signedUrl,
           arquivo_nome: file.name,
           arquivo_tipo: file.type,
         });
