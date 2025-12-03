@@ -20,12 +20,15 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Pencil, Trash2, DollarSign, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign, Eye, Paperclip, FileCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAppStore } from '@/store/appStore';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { toast } from 'sonner';
 import MultiVencimentosForm, { Vencimento } from '@/components/contas/MultiVencimentosForm';
+import { ComprovanteUpload } from '@/components/contas/ComprovanteUpload';
+import { ComprovanteViewer } from '@/components/contas/ComprovanteViewer';
+import { useComprovantes } from '@/hooks/useComprovantes';
 
 export default function ContasAPagarPage() {
   const queryClient = useQueryClient();
@@ -48,6 +51,18 @@ export default function ContasAPagarPage() {
   const [pagamentoDialog, setPagamentoDialog] = useState(false);
   const [contaSelecionada, setContaSelecionada] = useState<any>(null);
   const [valorPagamento, setValorPagamento] = useState('');
+  const [arquivoComprovante, setArquivoComprovante] = useState<File | null>(null);
+  
+  // Viewer de comprovante
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerPagamentoId, setViewerPagamentoId] = useState<string | null>(null);
+  
+  // Anexar comprovante depois
+  const [anexarDialog, setAnexarDialog] = useState(false);
+  const [pagamentoParaAnexar, setPagamentoParaAnexar] = useState<any>(null);
+  const [arquivoAnexar, setArquivoAnexar] = useState<File | null>(null);
+  
+  const { uploadComprovante, uploading, getComprovanteByPagamento } = useComprovantes();
 
   const [editDialog, setEditDialog] = useState(false);
   const [contaEdit, setContaEdit] = useState<any>(null);
@@ -180,13 +195,30 @@ export default function ContasAPagarPage() {
 
   // Mutation: registrar pagamento
   const pagarContaMutation = useMutation({
-    mutationFn: async ({ contaId, valor }: { contaId: string; valor: number }) => {
-      const { error } = await supabase.from('pagamentos').insert({
-        conta_id: contaId,
-        valor,
-        data: new Date().toISOString().split('T')[0],
-      });
+    mutationFn: async ({ contaId, valor, arquivo }: { contaId: string; valor: number; arquivo?: File | null }) => {
+      const { data: pagamento, error } = await supabase
+        .from('pagamentos')
+        .insert({
+          conta_id: contaId,
+          valor,
+          data: new Date().toISOString().split('T')[0],
+        })
+        .select('id')
+        .single();
+      
       if (error) throw error;
+      
+      // Se há arquivo, fazer upload do comprovante
+      if (arquivo && pagamento?.id) {
+        const uploadResult = await uploadComprovante(pagamento.id, arquivo);
+        if (!uploadResult.success) {
+          console.warn('Falha ao anexar comprovante:', uploadResult.error);
+          // Não falha a operação, apenas avisa
+          toast.warning('Pagamento registrado, mas falha ao anexar comprovante');
+        }
+      }
+      
+      return pagamento;
     },
     onSuccess: () => {
       toast.success('Pagamento registrado');
@@ -195,6 +227,7 @@ export default function ContasAPagarPage() {
       setPagamentoDialog(false);
       setValorPagamento('');
       setContaSelecionada(null);
+      setArquivoComprovante(null);
     },
     onError: () => {
       toast.error('Erro ao registrar pagamento');
@@ -286,7 +319,35 @@ export default function ContasAPagarPage() {
       toast.error('Valor inválido');
       return;
     }
-    pagarContaMutation.mutate({ contaId: contaSelecionada.id, valor });
+    pagarContaMutation.mutate({ contaId: contaSelecionada.id, valor, arquivo: arquivoComprovante });
+  };
+
+  const handleAnexarComprovante = async () => {
+    if (!pagamentoParaAnexar || !arquivoAnexar) {
+      toast.error('Selecione um arquivo');
+      return;
+    }
+    
+    const result = await uploadComprovante(pagamentoParaAnexar.id, arquivoAnexar);
+    if (result.success) {
+      toast.success('Comprovante anexado com sucesso');
+      setAnexarDialog(false);
+      setPagamentoParaAnexar(null);
+      setArquivoAnexar(null);
+    } else {
+      toast.error(result.error || 'Erro ao anexar comprovante');
+    }
+  };
+
+  const handleVerComprovante = (pagamentoId: string) => {
+    setViewerPagamentoId(pagamentoId);
+    setViewerOpen(true);
+  };
+
+  const handleAbrirAnexar = (pagamento: any) => {
+    setPagamentoParaAnexar(pagamento);
+    setArquivoAnexar(null);
+    setAnexarDialog(true);
   };
 
   const handleEditar = (conta: any) => {
@@ -555,7 +616,10 @@ export default function ContasAPagarPage() {
       </Card>
 
       {/* Dialog: Pagamento */}
-      <Dialog open={pagamentoDialog} onOpenChange={setPagamentoDialog}>
+      <Dialog open={pagamentoDialog} onOpenChange={(open) => {
+        setPagamentoDialog(open);
+        if (!open) setArquivoComprovante(null);
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Registrar Pagamento</DialogTitle>
@@ -563,6 +627,9 @@ export default function ContasAPagarPage() {
           <div className="space-y-4">
             <p>
               Conta: <strong>{contaSelecionada?.descricao}</strong>
+            </p>
+            <p>
+              Vencimento: <strong>{formatDate(contaSelecionada?.vencimento)}</strong>
             </p>
             <p>
               Valor em Aberto:{' '}
@@ -577,9 +644,19 @@ export default function ContasAPagarPage() {
                 onChange={(e) => setValorPagamento(e.target.value)}
               />
             </div>
+            <ComprovanteUpload
+              file={arquivoComprovante}
+              onFileChange={setArquivoComprovante}
+              disabled={pagarContaMutation.isPending || uploading}
+            />
           </div>
           <DialogFooter>
-            <Button onClick={handleConfirmarPagamento}>Confirmar</Button>
+            <Button 
+              onClick={handleConfirmarPagamento}
+              disabled={pagarContaMutation.isPending || uploading}
+            >
+              {pagarContaMutation.isPending || uploading ? 'Processando...' : 'Confirmar'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -642,17 +719,39 @@ export default function ContasAPagarPage() {
               <div className="space-y-2">
                 {historico.map((pag) => (
                   <div key={pag.id} className="border p-2 rounded">
-                    <p>
-                      <strong>Data:</strong> {formatDate(pag.data)}
-                    </p>
-                    <p>
-                      <strong>Valor:</strong> {formatCurrency(pag.valor)}
-                    </p>
-                    {pag.forma && (
-                      <p>
-                        <strong>Forma:</strong> {pag.forma}
-                      </p>
-                    )}
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p>
+                          <strong>Data:</strong> {formatDate(pag.data)}
+                        </p>
+                        <p>
+                          <strong>Valor:</strong> {formatCurrency(pag.valor)}
+                        </p>
+                        {pag.forma && (
+                          <p>
+                            <strong>Forma:</strong> {pag.forma}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleVerComprovante(pag.id)}
+                          title="Ver comprovante"
+                        >
+                          <FileCheck className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAbrirAnexar(pag)}
+                          title="Anexar comprovante"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -660,6 +759,47 @@ export default function ContasAPagarPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog: Anexar Comprovante */}
+      <Dialog open={anexarDialog} onOpenChange={(open) => {
+        setAnexarDialog(open);
+        if (!open) {
+          setArquivoAnexar(null);
+          setPagamentoParaAnexar(null);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anexar Comprovante</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Anexe o comprovante de pagamento. O arquivo será mantido por 1 ano.
+            </p>
+            <ComprovanteUpload
+              file={arquivoAnexar}
+              onFileChange={setArquivoAnexar}
+              disabled={uploading}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={handleAnexarComprovante}
+              disabled={!arquivoAnexar || uploading}
+            >
+              {uploading ? 'Enviando...' : 'Anexar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Viewer de Comprovante */}
+      <ComprovanteViewer
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        pagamentoId={viewerPagamentoId}
+        contaDescricao={contaSelecionada?.descricao}
+      />
     </div>
   );
 }
