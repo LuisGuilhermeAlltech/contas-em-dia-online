@@ -1,1 +1,4 @@
 project_id = "todwsnxcaiytmdpgrvya"
+
+[functions.cleanup-comprovantes]
+verify_jwt = false
