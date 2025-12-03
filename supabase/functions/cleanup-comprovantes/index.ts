@@ -46,10 +46,8 @@ Deno.serve(async (req) => {
 
     for (const comprovante of expirados) {
       try {
-        // Extrair o path do arquivo da URL
-        const urlParts = comprovante.arquivo_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        const filePath = `comprovantes/${fileName}`;
+        // arquivo_url já contém o path direto (ex: "comprovantes/uuid_123456.pdf")
+        const filePath = comprovante.arquivo_url;
 
         console.log(`[cleanup-comprovantes] Removendo arquivo: ${filePath}`);
 

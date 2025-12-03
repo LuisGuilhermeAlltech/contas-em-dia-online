@@ -33,21 +33,12 @@ export function useComprovantes() {
         throw new Error(uploadError.message);
       }
 
-      // Obter signed URL (bucket privado)
-      const { data: urlData, error: urlError } = await supabase.storage
-        .from('comprovantes-boletos')
-        .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 ano de validade
-
-      if (urlError || !urlData?.signedUrl) {
-        throw new Error('Erro ao gerar URL do arquivo');
-      }
-
-      // Registrar na tabela
+      // Registrar na tabela - salvar apenas o PATH, não a signed URL
       const { error: insertError } = await (supabase as any)
         .from('comprovantes_pagamento')
         .insert({
           pagamento_id: pagamentoId,
-          arquivo_url: urlData.signedUrl,
+          arquivo_url: filePath, // Salva o path fixo, ex: "comprovantes/uuid_123456.pdf"
           arquivo_nome: file.name,
           arquivo_tipo: file.type,
         });
@@ -81,7 +72,19 @@ export function useComprovantes() {
       return null;
     }
 
-    return data as Comprovante | null;
+    if (!data) {
+      return null;
+    }
+
+    // Gerar signed URL na hora usando o path salvo
+    const { data: urlData } = await supabase.storage
+      .from('comprovantes-boletos')
+      .createSignedUrl(data.arquivo_url, 3600); // 1 hora de validade
+
+    return {
+      ...data,
+      arquivo_url: urlData?.signedUrl || data.arquivo_url,
+    } as Comprovante;
   };
 
   const getComprovantesByConta = async (
@@ -110,19 +113,44 @@ export function useComprovantes() {
       return [];
     }
 
-    return (data as Comprovante[]) || [];
+    if (!data?.length) {
+      return [];
+    }
+
+    // Gerar signed URL para cada comprovante
+    const comprovantesComUrl = await Promise.all(
+      data.map(async (comp: any) => {
+        const { data: urlData } = await supabase.storage
+          .from('comprovantes-boletos')
+          .createSignedUrl(comp.arquivo_url, 3600);
+
+        return {
+          ...comp,
+          arquivo_url: urlData?.signedUrl || comp.arquivo_url,
+        };
+      })
+    );
+
+    return comprovantesComUrl as Comprovante[];
   };
 
   const deleteComprovante = async (
     comprovante: Comprovante
   ): Promise<boolean> => {
     try {
-      // Extrair o path do arquivo da URL
-      const urlParts = comprovante.arquivo_url.split('/');
-      const filePath = `comprovantes/${urlParts[urlParts.length - 1]}`;
+      // Buscar o path original do banco (comprovante.arquivo_url pode ser signed URL)
+      const { data: compData } = await (supabase as any)
+        .from('comprovantes_pagamento')
+        .select('arquivo_url')
+        .eq('id', comprovante.id)
+        .single();
 
-      // Deletar arquivo do storage
-      await supabase.storage.from('comprovantes-boletos').remove([filePath]);
+      const filePath = compData?.arquivo_url;
+
+      if (filePath) {
+        // Deletar arquivo do storage usando o path direto
+        await supabase.storage.from('comprovantes-boletos').remove([filePath]);
+      }
 
       // Deletar registro
       const { error } = await (supabase as any)
