@@ -19,40 +19,71 @@ export function useComprovantes() {
     file: File
   ): Promise<{ success: boolean; error?: string }> => {
     setUploading(true);
+    
+    console.log('[DEBUG] uploadComprovante iniciado:', {
+      pagamentoId,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+    });
+
+    // Validar pagamentoId
+    if (!pagamentoId) {
+      console.error('[DEBUG] pagamentoId é null ou undefined!');
+      setUploading(false);
+      return { success: false, error: 'pagamentoId é obrigatório' };
+    }
+
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${pagamentoId}_${Date.now()}.${fileExt}`;
       const filePath = `comprovantes/${fileName}`;
 
+      console.log('[DEBUG] Tentando upload para bucket comprovantes-boletos:', filePath);
+
       // Upload do arquivo
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('comprovantes-boletos')
         .upload(filePath, file);
 
+      console.log('[DEBUG] Resultado do upload:', { uploadData, uploadError });
+
       if (uploadError) {
-        throw new Error(uploadError.message);
+        console.error('[DEBUG] Erro no upload:', uploadError);
+        throw new Error(uploadError.message || 'Erro no upload do arquivo');
       }
+
+      console.log('[DEBUG] Upload OK. Tentando INSERT em comprovantes_pagamento...');
 
       // Registrar na tabela - salvar apenas o PATH, não a signed URL
-      const { error: insertError } = await (supabase as any)
+      const insertPayload = {
+        pagamento_id: pagamentoId,
+        arquivo_url: filePath,
+        arquivo_nome: file.name,
+        arquivo_tipo: file.type,
+      };
+      
+      console.log('[DEBUG] Payload do INSERT:', insertPayload);
+
+      const { data: insertData, error: insertError } = await supabase
         .from('comprovantes_pagamento')
-        .insert({
-          pagamento_id: pagamentoId,
-          arquivo_url: filePath, // Salva o path fixo, ex: "comprovantes/uuid_123456.pdf"
-          arquivo_nome: file.name,
-          arquivo_tipo: file.type,
-        });
+        .insert(insertPayload)
+        .select();
+
+      console.log('[DEBUG] Resultado do INSERT:', { insertData, insertError });
 
       if (insertError) {
+        console.error('[DEBUG] Erro no INSERT:', insertError);
         // Tentar remover arquivo se falhar o insert
         await supabase.storage.from('comprovantes-boletos').remove([filePath]);
-        throw new Error(insertError.message);
+        throw new Error(insertError.message || 'Erro ao registrar comprovante');
       }
 
+      console.log('[DEBUG] Comprovante salvo com sucesso!');
       return { success: true };
     } catch (error: any) {
-      console.error('Erro ao fazer upload:', error);
-      return { success: false, error: error.message };
+      console.error('[DEBUG] Erro geral no uploadComprovante:', error);
+      return { success: false, error: error.message || 'Erro desconhecido' };
     } finally {
       setUploading(false);
     }

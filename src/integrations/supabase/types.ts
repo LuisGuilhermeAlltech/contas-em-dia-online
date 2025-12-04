@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      comprovantes_pagamento: {
+        Row: {
+          arquivo_nome: string
+          arquivo_tipo: string
+          arquivo_url: string
+          data_expiracao: string
+          data_upload: string
+          id: string
+          pagamento_id: string
+        }
+        Insert: {
+          arquivo_nome: string
+          arquivo_tipo: string
+          arquivo_url: string
+          data_expiracao?: string
+          data_upload?: string
+          id?: string
+          pagamento_id: string
+        }
+        Update: {
+          arquivo_nome?: string
+          arquivo_tipo?: string
+          arquivo_url?: string
+          data_expiracao?: string
+          data_upload?: string
+          id?: string
+          pagamento_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comprovantes_pagamento_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contas: {
         Row: {
           created_at: string | null
