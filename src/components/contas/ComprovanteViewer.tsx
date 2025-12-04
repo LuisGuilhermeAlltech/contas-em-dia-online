@@ -40,6 +40,9 @@ export function ComprovanteViewer({
 
   const isPdf = comprovante?.arquivo_tipo === 'application/pdf';
   const isImage = comprovante?.arquivo_tipo?.startsWith('image/');
+  
+  // Detectar se está no ambiente de preview do Lovable (sandbox)
+  const isLovablePreview = window.location.hostname.includes('lovableproject.com');
 
   const handleDownload = () => {
     if (comprovante?.arquivo_url) {
@@ -94,11 +97,28 @@ export function ComprovanteViewer({
                   className="max-w-full max-h-[500px] mx-auto object-contain"
                 />
               ) : isPdf ? (
-                <iframe
-                  src={comprovante.arquivo_url}
-                  className="w-full h-[500px]"
-                  title="Comprovante PDF"
-                />
+                isLovablePreview ? (
+                  // No preview do Lovable, o iframe é bloqueado para PDFs
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <FileText className="h-16 w-16 text-primary mb-4" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {comprovante.arquivo_nome}
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      O preview de PDF não está disponível neste ambiente.
+                    </p>
+                    <Button onClick={handleDownload}>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Abrir PDF em nova aba
+                    </Button>
+                  </div>
+                ) : (
+                  <iframe
+                    src={comprovante.arquivo_url}
+                    className="w-full h-[500px]"
+                    title="Comprovante PDF"
+                  />
+                )
               ) : (
                 <div className="flex flex-col items-center justify-center py-12">
                   <FileText className="h-16 w-16 text-muted-foreground mb-4" />
