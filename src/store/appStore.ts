@@ -15,7 +15,6 @@ const COMPANIES = {
   'alltech-matriz': 'AllTech Matriz',
   'alltech-filial': 'AllTech Filial',
   'grupo-lider': 'Grupo Líder',
-  'adryssia-cortez': 'Adryssia Cortez',
   'luis-guilherme': 'Luis Guilherme',
 };
 
