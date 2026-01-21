@@ -318,6 +318,18 @@ export type Database = {
           vencimento: string
         }[]
       }
+      rpc_contas_vencidas_e_hoje: {
+        Args: { p_empresa: string; p_hoje: string }
+        Returns: {
+          descricao: string
+          id: string
+          is_hoje: boolean
+          is_vencido: boolean
+          saldo: number
+          status: string
+          vencimento: string
+        }[]
+      }
       rpc_dashboard_resumo: {
         Args: {
           p_empresa: string

@@ -73,10 +73,10 @@ export default function DashboardPage() {
     enabled: !!selectedCompanyId,
   });
 
-  const { data: proximasContas = [] } = useQuery({
-    queryKey: ['proximas-contas', selectedCompanyId, hoje],
+  const { data: contasVencidasHoje = [] } = useQuery({
+    queryKey: ['contas-vencidas-hoje', selectedCompanyId, hoje],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_contas_proximas', {
+      const { data, error } = await supabase.rpc('rpc_contas_vencidas_e_hoje', {
         p_empresa: selectedCompanyId,
         p_hoje: hoje,
       });
@@ -168,14 +168,14 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Próximas do Vencimento */}
+      {/* Vencidas e Vencendo Hoje */}
       <Card>
         <CardHeader>
-          <CardTitle>Próximas do Vencimento (7 dias)</CardTitle>
+          <CardTitle>Vencidas e Vencendo Hoje</CardTitle>
         </CardHeader>
         <CardContent>
-          {!proximasContas || proximasContas.length === 0 ? (
-            <p className="text-muted-foreground">Nenhuma conta próxima do vencimento.</p>
+          {!contasVencidasHoje || contasVencidasHoje.length === 0 ? (
+            <p className="text-muted-foreground">Nenhuma conta vencida ou vencendo hoje.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -188,8 +188,13 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {proximasContas.map((conta: any) => (
-                    <tr key={conta.id} className="border-b hover:bg-muted/50">
+                  {contasVencidasHoje.map((conta: any) => (
+                    <tr 
+                      key={conta.id} 
+                      className={`border-b hover:bg-muted/50 ${
+                        conta.is_vencido ? 'bg-destructive/10' : conta.is_hoje ? 'bg-orange-50' : ''
+                      }`}
+                    >
                       <td className="p-2">{conta.descricao}</td>
                       <td className="p-2">{formatDate(conta.vencimento)}</td>
                       <td className="p-2 text-right">
@@ -198,12 +203,14 @@ export default function DashboardPage() {
                       <td className="p-2 text-center">
                         <span
                           className={`px-2 py-1 rounded text-xs font-semibold ${
-                            conta.status === 'Pago'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-orange-100 text-orange-800'
+                            conta.is_vencido
+                              ? 'bg-destructive/20 text-destructive'
+                              : conta.is_hoje
+                              ? 'bg-orange-100 text-orange-800'
+                              : 'bg-muted text-muted-foreground'
                           }`}
                         >
-                          {conta.status}
+                          {conta.is_vencido ? 'Vencido' : conta.is_hoje ? 'Vence Hoje' : conta.status}
                         </span>
                       </td>
                     </tr>
