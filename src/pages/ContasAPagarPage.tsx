@@ -278,6 +278,41 @@ export default function ContasAPagarPage() {
     },
   });
 
+  // Mutation: excluir pagamento
+  const excluirPagamentoMutation = useMutation({
+    mutationFn: async (pagamentoId: string) => {
+      // Primeiro exclui comprovantes associados
+      await supabase
+        .from('comprovantes_pagamento')
+        .delete()
+        .eq('pagamento_id', pagamentoId);
+      
+      // Depois exclui o pagamento
+      const { error } = await supabase
+        .from('pagamentos')
+        .delete()
+        .eq('id', pagamentoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Pagamento excluído');
+      // Atualiza o histórico local
+      setHistorico(prev => prev.filter(p => p.id !== excluirPagamentoMutation.variables));
+      queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo', selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ['total-hoje', selectedCompanyId] });
+    },
+    onError: () => {
+      toast.error('Erro ao excluir pagamento');
+    },
+  });
+
+  const handleExcluirPagamento = (pagamentoId: string) => {
+    if (confirm('Tem certeza que deseja excluir este pagamento? O saldo da conta será recalculado.')) {
+      excluirPagamentoMutation.mutate(pagamentoId);
+    }
+  };
+
   const handleCriarConta = () => {
     // Validação básica
     if (!novaConta.descricao || !novaConta.valor_original) {
@@ -749,6 +784,15 @@ export default function ContasAPagarPage() {
                           title="Anexar comprovante"
                         >
                           <Paperclip className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleExcluirPagamento(pag.id)}
+                          title="Excluir pagamento"
+                          disabled={excluirPagamentoMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     </div>
