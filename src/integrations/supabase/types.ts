@@ -54,6 +54,7 @@ export type Database = {
       }
       contas: {
         Row: {
+          codigo_barras: string | null
           created_at: string | null
           data_emissao: string | null
           deleted_at: string | null
@@ -74,6 +75,7 @@ export type Database = {
           vencimento: string
         }
         Insert: {
+          codigo_barras?: string | null
           created_at?: string | null
           data_emissao?: string | null
           deleted_at?: string | null
@@ -94,6 +96,7 @@ export type Database = {
           vencimento: string
         }
         Update: {
+          codigo_barras?: string | null
           created_at?: string | null
           data_emissao?: string | null
           deleted_at?: string | null

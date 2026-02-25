@@ -1,0 +1,1 @@
+ALTER TABLE public.contas ADD COLUMN codigo_barras TEXT DEFAULT NULL;

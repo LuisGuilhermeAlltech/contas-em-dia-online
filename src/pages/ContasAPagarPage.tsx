@@ -44,6 +44,7 @@ export default function ContasAPagarPage() {
     descricao: '',
     valor_original: '',
     data_vencimento: '',
+    codigo_barras: '',
   });
   const [vencimentos, setVencimentos] = useState<Vencimento[]>([]);
   const [dialogNova, setDialogNova] = useState(false);
@@ -70,6 +71,7 @@ export default function ContasAPagarPage() {
     descricao: '',
     valor_original: '',
     data_vencimento: '',
+    codigo_barras: '',
   });
 
   const [historicoDialog, setHistoricoDialog] = useState(false);
@@ -156,6 +158,7 @@ export default function ContasAPagarPage() {
           parcela_numero: venc.parcela,
           total_parcelas: dados.vencimentos.length,
           grupo_parcela_id: grupoId,
+          codigo_barras: dados.codigo_barras || null,
         }));
 
         const { error } = await supabase.from('contas').insert(contasParaInserir);
@@ -171,6 +174,7 @@ export default function ContasAPagarPage() {
           parcela_numero: 1,
           total_parcelas: 1,
           grupo_parcela_id: null,
+          codigo_barras: dados.codigo_barras || null,
         });
         if (error) throw error;
       }
@@ -185,7 +189,7 @@ export default function ContasAPagarPage() {
       queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo', selectedCompanyId] });
       setDialogNova(false);
-      setNovaConta({ descricao: '', valor_original: '', data_vencimento: '' });
+      setNovaConta({ descricao: '', valor_original: '', data_vencimento: '', codigo_barras: '' });
       setVencimentos([]);
     },
     onError: () => {
@@ -243,6 +247,7 @@ export default function ContasAPagarPage() {
           descricao: dados.descricao,
           valor_total: Number(dados.valor_original),
           vencimento: dados.data_vencimento,
+          codigo_barras: dados.codigo_barras || null,
         })
         .eq('id', id);
       if (error) throw error;
@@ -387,10 +392,20 @@ export default function ContasAPagarPage() {
 
   const handleEditar = (conta: any) => {
     setContaEdit(conta);
+    // Buscar codigo_barras da tabela contas
+    supabase.from('contas').select('codigo_barras').eq('id', conta.id).single().then(({ data }) => {
+      setEditForm({
+        descricao: conta.descricao || '',
+        valor_original: String(conta.valor_total || ''),
+        data_vencimento: conta.vencimento || '',
+        codigo_barras: data?.codigo_barras || '',
+      });
+    });
     setEditForm({
       descricao: conta.descricao || '',
       valor_original: String(conta.valor_total || ''),
       data_vencimento: conta.vencimento || '',
+      codigo_barras: '',
     });
     setEditDialog(true);
   };
@@ -487,6 +502,16 @@ export default function ContasAPagarPage() {
                   />
                 </div>
               )}
+
+              {/* Código de barras */}
+              <div>
+                <Label>Código de Barras</Label>
+                <Input
+                  value={novaConta.codigo_barras}
+                  onChange={(e) => setNovaConta({ ...novaConta, codigo_barras: e.target.value })}
+                  placeholder="Cole o código de barras aqui"
+                />
+              </div>
 
               {/* Seção de múltiplos vencimentos */}
               <div className="pt-4">
@@ -729,6 +754,14 @@ export default function ContasAPagarPage() {
                 onChange={(e) =>
                   setEditForm({ ...editForm, data_vencimento: e.target.value })
                 }
+              />
+            </div>
+            <div>
+              <Label>Código de Barras</Label>
+              <Input
+                value={editForm.codigo_barras}
+                onChange={(e) => setEditForm({ ...editForm, codigo_barras: e.target.value })}
+                placeholder="Cole o código de barras aqui"
               />
             </div>
           </div>
