@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      categorias_conta: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          empresa_id: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          empresa_id?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          empresa_id?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categorias_conta_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comprovantes_pagamento: {
         Row: {
           arquivo_nome: string
@@ -54,13 +86,18 @@ export type Database = {
       }
       contas: {
         Row: {
+          categoria_id: string | null
+          centro_custo: string | null
           codigo_barras: string | null
           created_at: string | null
           data_emissao: string | null
+          data_pagamento: string | null
           deleted_at: string | null
           desconto: number | null
           descricao: string
           empresa: string
+          empresa_id: string | null
+          forma_pagamento: string | null
           fornecedor_id: string | null
           grupo_parcela_id: string | null
           id: string
@@ -69,19 +106,27 @@ export type Database = {
           observacoes: string | null
           parcela_numero: number | null
           responsavel: string | null
+          status: string | null
+          tipo_conta: string | null
           total_pago: number | null
           total_parcelas: number | null
+          updated_at: string | null
           valor_total: number
           vencimento: string
         }
         Insert: {
+          categoria_id?: string | null
+          centro_custo?: string | null
           codigo_barras?: string | null
           created_at?: string | null
           data_emissao?: string | null
+          data_pagamento?: string | null
           deleted_at?: string | null
           desconto?: number | null
           descricao: string
           empresa: string
+          empresa_id?: string | null
+          forma_pagamento?: string | null
           fornecedor_id?: string | null
           grupo_parcela_id?: string | null
           id?: string
@@ -90,19 +135,27 @@ export type Database = {
           observacoes?: string | null
           parcela_numero?: number | null
           responsavel?: string | null
+          status?: string | null
+          tipo_conta?: string | null
           total_pago?: number | null
           total_parcelas?: number | null
+          updated_at?: string | null
           valor_total: number
           vencimento: string
         }
         Update: {
+          categoria_id?: string | null
+          centro_custo?: string | null
           codigo_barras?: string | null
           created_at?: string | null
           data_emissao?: string | null
+          data_pagamento?: string | null
           deleted_at?: string | null
           desconto?: number | null
           descricao?: string
           empresa?: string
+          empresa_id?: string | null
+          forma_pagamento?: string | null
           fornecedor_id?: string | null
           grupo_parcela_id?: string | null
           id?: string
@@ -111,12 +164,29 @@ export type Database = {
           observacoes?: string | null
           parcela_numero?: number | null
           responsavel?: string | null
+          status?: string | null
+          tipo_conta?: string | null
           total_pago?: number | null
           total_parcelas?: number | null
+          updated_at?: string | null
           valor_total?: number
           vencimento?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contas_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_conta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contas_fornecedor_id_fkey"
             columns: ["fornecedor_id"]
@@ -125,6 +195,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      empresas: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          id: string
+          nome: string
+          slug: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          slug?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          slug?: string | null
+        }
+        Relationships: []
       }
       fornecedores: {
         Row: {
@@ -289,6 +383,21 @@ export type Database = {
       }
     }
     Functions: {
+      fn_dashboard_geral: { Args: never; Returns: Json }
+      fn_dashboard_individual: {
+        Args: { p_empresa_id: string }
+        Returns: {
+          contas_pendentes_qtd: number
+          contas_pendentes_valor: number
+          contas_vencidas_qtd: number
+          contas_vencidas_valor: number
+          pagas_mes_qtd: number
+          pagas_mes_valor: number
+          total_hoje: number
+          total_mes_atual: number
+          total_semana_atual: number
+        }[]
+      }
       fn_proximas_contas: {
         Args: { p_empresa: string; p_limite?: number }
         Returns: {
@@ -300,6 +409,58 @@ export type Database = {
           valor_aberto: number
         }[]
       }
+      fn_relatorio_fluxo_periodo: {
+        Args: {
+          p_data_fim?: string
+          p_data_ini?: string
+          p_empresa_id?: string
+        }
+        Returns: {
+          aberto_valor: number
+          dia: string
+          pago_valor: number
+          vencido_valor: number
+        }[]
+      }
+      fn_relatorio_fornecedor: {
+        Args: {
+          p_data_fim?: string
+          p_data_ini?: string
+          p_empresa_id?: string
+          p_fornecedor?: string
+        }
+        Returns: {
+          fornecedor: string
+          media_mensal: number
+          total_qtd: number
+          total_valor: number
+          ultimo_pagamento: string
+        }[]
+      }
+      fn_relatorio_por_categoria: {
+        Args: {
+          p_data_fim?: string
+          p_data_ini?: string
+          p_empresa_id?: string
+        }
+        Returns: {
+          categoria_nome: string
+          total_qtd: number
+          total_valor: number
+        }[]
+      }
+      fn_relatorio_por_forma_pagamento: {
+        Args: {
+          p_data_fim?: string
+          p_data_ini?: string
+          p_empresa_id?: string
+        }
+        Returns: {
+          forma_pagamento: string
+          total_qtd: number
+          total_valor: number
+        }[]
+      }
       fn_resumo_cp: {
         Args: { p_empresa: string; p_ref?: string }
         Returns: {
@@ -309,6 +470,13 @@ export type Database = {
           total_hoje: number
           total_mes_atual: number
           total_prox_semana: number
+        }[]
+      }
+      fn_week_bounds: {
+        Args: { ref_date?: string }
+        Returns: {
+          week_end: string
+          week_start: string
         }[]
       }
       rpc_contas_proximas: {
