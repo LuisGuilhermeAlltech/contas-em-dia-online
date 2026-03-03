@@ -1,205 +1,141 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { CardKpi } from '@/components/dashboard/CardKpi';
 import { useAppStore } from '@/store/appStore';
+import { useEmpresaId } from '@/hooks/useEmpresas';
+import { useDashboardEmpresa } from '@/hooks/useDashboardEmpresa';
 import { formatCurrency, formatDate } from '@/lib/formatters';
-import { toZonedTime } from 'date-fns-tz';
-
-const TIMEZONE = 'America/Fortaleza';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function DashboardPage() {
   const { selectedCompanyId } = useAppStore();
+  const empresaUuid = useEmpresaId(selectedCompanyId);
+  const { data: dash, isLoading } = useDashboardEmpresa(empresaUuid);
+  const [mostrar3dias, setMostrar3dias] = useState(false);
 
-  const hoje = toZonedTime(new Date(), TIMEZONE).toISOString().split('T')[0];
-  const inicioMes = toZonedTime(new Date(new Date().getFullYear(), new Date().getMonth(), 1), TIMEZONE).toISOString().split('T')[0];
-  const fimMes = toZonedTime(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0), TIMEZONE).toISOString().split('T')[0];
-  
-  const amanha = toZonedTime(new Date(new Date().getTime() + 24 * 60 * 60 * 1000), TIMEZONE).toISOString().split('T')[0];
-  const mais7dias = toZonedTime(new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000), TIMEZONE).toISOString().split('T')[0];
-
-  const { data: totalHoje } = useQuery({
-    queryKey: ['total-hoje', selectedCompanyId, hoje],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_total_contas_do_dia', {
-        p_empresa: selectedCompanyId,
-        p_data: hoje,
-      });
-      if (error) throw error;
-      return data || 0;
-    },
-    enabled: !!selectedCompanyId,
-  });
-
-  const { data: totalProximaSemana } = useQuery({
-    queryKey: ['total-proxima-semana', selectedCompanyId, amanha, mais7dias],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_total_proxima_semana', {
-        p_empresa: selectedCompanyId,
-        p_data_inicio: amanha,
-        p_data_fim: mais7dias,
-      });
-      if (error) throw error;
-      return data || 0;
-    },
-    enabled: !!selectedCompanyId,
-  });
-
-  const { data: totalMesAtual } = useQuery({
-    queryKey: ['total-mes-atual', selectedCompanyId, inicioMes, fimMes],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_total_mes_atual', {
-        p_empresa: selectedCompanyId,
-        p_data_inicio: inicioMes,
-        p_data_fim: fimMes,
-      });
-      if (error) throw error;
-      return data || 0;
-    },
-    enabled: !!selectedCompanyId,
-  });
-
-  const { data: resumo } = useQuery({
-    queryKey: ['dashboard-resumo', selectedCompanyId, hoje, inicioMes, fimMes],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_dashboard_resumo', {
-        p_empresa: selectedCompanyId,
-        p_hoje: hoje,
-        p_inicio_mes: inicioMes,
-        p_fim_mes: fimMes,
-      });
-      if (error) throw error;
-      return data?.[0];
-    },
-    enabled: !!selectedCompanyId,
-  });
-
+  // Contas vencidas e vencendo hoje (usa RPC antiga com empresa text)
   const { data: contasVencidasHoje = [] } = useQuery({
-    queryKey: ['contas-vencidas-hoje', selectedCompanyId, hoje],
+    queryKey: ['contas-vencidas-hoje-v2', empresaUuid, mostrar3dias],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_contas_vencidas_e_hoje', {
-        p_empresa: selectedCompanyId,
-        p_hoje: hoje,
-      });
+      // Query direto para ter mais controle
+      const hoje = new Date().toISOString().split('T')[0];
+      let query = supabase
+        .from('contas')
+        .select('id, descricao, vencimento, valor_total, total_pago, status')
+        .eq('empresa_id', empresaUuid!)
+        .eq('status', 'pendente')
+        .is('deleted_at', null)
+        .order('vencimento', { ascending: true })
+        .limit(15);
+
+      if (mostrar3dias) {
+        const d3 = new Date();
+        d3.setDate(d3.getDate() + 3);
+        query = query.lte('vencimento', d3.toISOString().split('T')[0]);
+      } else {
+        query = query.lte('vencimento', hoje);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      return (data || []).map((c: any) => ({
+        ...c,
+        saldo: Number(c.valor_total) - Number(c.total_pago || 0),
+        is_vencido: c.vencimento < hoje,
+        is_hoje: c.vencimento === hoje,
+      }));
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!empresaUuid,
   });
+
+  if (isLoading || !dash) {
+    return <div className="p-6 text-muted-foreground">Carregando...</div>;
+  }
 
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold text-foreground">Dashboard</h2>
 
       {/* Cards de Totais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Total Hoje</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">
-              {formatCurrency(Number(totalHoje) || 0)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Próxima Semana</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">
-              {formatCurrency(Number(totalProximaSemana) || 0)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Mês Atual</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">
-              {formatCurrency(Number(totalMesAtual) || 0)}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardKpi
+          titulo="Total Hoje"
+          valor={formatCurrency(Number(dash.total_hoje))}
+          estado="normal"
+        />
+        <CardKpi
+          titulo="Semana Atual"
+          valor={formatCurrency(Number(dash.total_semana_atual))}
+          estado="normal"
+        />
+        <CardKpi
+          titulo="Mes Atual"
+          valor={formatCurrency(Number(dash.total_mes_atual))}
+          estado="normal"
+        />
       </div>
 
       {/* Cards de Status */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-l-4 border-l-destructive">
-          <CardHeader>
-            <CardTitle className="text-base text-destructive">
-              Contas Vencidas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-destructive">
-              {Number(resumo?.contas_vencidas) || 0}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-orange-500">
-          <CardHeader>
-            <CardTitle className="text-base text-orange-700">
-              Contas Pendentes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-orange-700">
-              {Number(resumo?.contas_pendentes) || 0}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader>
-            <CardTitle className="text-base text-green-700">
-              Contas Pagas no Mês
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-green-700">
-              {Number(resumo?.contas_pagas_mes) || 0}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardKpi
+          titulo="Contas Vencidas"
+          valor={String(dash.contas_vencidas_qtd)}
+          subtitulo={formatCurrency(Number(dash.contas_vencidas_valor))}
+          estado="critico"
+        />
+        <CardKpi
+          titulo="Contas Pendentes"
+          valor={String(dash.contas_pendentes_qtd)}
+          subtitulo={formatCurrency(Number(dash.contas_pendentes_valor))}
+          estado="alerta"
+        />
+        <CardKpi
+          titulo="Pagas no Mes"
+          valor={String(dash.pagas_mes_qtd)}
+          subtitulo={formatCurrency(Number(dash.pagas_mes_valor))}
+          estado="positivo"
+        />
       </div>
 
       {/* Vencidas e Vencendo Hoje */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Vencidas e Vencendo Hoje</CardTitle>
+          <Button
+            variant={mostrar3dias ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={() => setMostrar3dias(!mostrar3dias)}
+          >
+            {mostrar3dias ? 'Apenas hoje' : 'Incluir 3 dias'}
+          </Button>
         </CardHeader>
         <CardContent>
-          {!contasVencidasHoje || contasVencidasHoje.length === 0 ? (
+          {contasVencidasHoje.length === 0 ? (
             <p className="text-muted-foreground">Nenhuma conta vencida ou vencendo hoje.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2">Descrição</th>
-                    <th className="text-left p-2">Vencimento</th>
-                    <th className="text-right p-2">Valor em Aberto</th>
-                    <th className="text-center p-2">Status</th>
+                    <th className="text-left p-2 text-sm">Descricao</th>
+                    <th className="text-left p-2 text-sm">Vencimento</th>
+                    <th className="text-right p-2 text-sm">Valor em Aberto</th>
+                    <th className="text-center p-2 text-sm">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {contasVencidasHoje.map((conta: any) => (
-                    <tr 
-                      key={conta.id} 
+                    <tr
+                      key={conta.id}
                       className={`border-b hover:bg-muted/50 ${
                         conta.is_vencido ? 'bg-destructive/10' : conta.is_hoje ? 'bg-orange-50' : ''
                       }`}
                     >
                       <td className="p-2">{conta.descricao}</td>
                       <td className="p-2">{formatDate(conta.vencimento)}</td>
-                      <td className="p-2 text-right">
-                        {formatCurrency(Number(conta.saldo) || 0)}
-                      </td>
+                      <td className="p-2 text-right">{formatCurrency(conta.saldo)}</td>
                       <td className="p-2 text-center">
                         <span
                           className={`px-2 py-1 rounded text-xs font-semibold ${
@@ -210,7 +146,7 @@ export default function DashboardPage() {
                               : 'bg-muted text-muted-foreground'
                           }`}
                         >
-                          {conta.is_vencido ? 'Vencido' : conta.is_hoje ? 'Vence Hoje' : conta.status}
+                          {conta.is_vencido ? 'Vencido' : conta.is_hoje ? 'Vence Hoje' : 'Proximo'}
                         </span>
                       </td>
                     </tr>
