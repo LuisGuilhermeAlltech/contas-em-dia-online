@@ -11,7 +11,7 @@ const Index = () => {
   const renderContent = () => {
     switch (activeMenu) {
       case "dashboard-geral":
-        return <DashboardGeralPage />;
+        return <DashboardGeralPage onNavigate={setActiveMenu} />;
       case "dashboard":
         return <DashboardPage />;
       case "contas":
