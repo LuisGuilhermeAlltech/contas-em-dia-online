@@ -1,16 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-interface Alertas {
+interface GrupoKpis {
   vencidas_qtd: number;
   vencidas_valor: number;
-  vence_hoje_qtd: number;
-  vence_hoje_valor: number;
-  vence_3dias_qtd: number;
-  vence_3dias_valor: number;
-  vence_semana_qtd: number;
-  vence_semana_valor: number;
-  total_aberto_valor: number;
+  semana_qtd: number;
+  semana_valor: number;
+  aberto_qtd: number;
+  aberto_valor: number;
   pago_mes_qtd: number;
   pago_mes_valor: number;
 }
@@ -18,25 +15,22 @@ interface Alertas {
 interface EmpresaResumo {
   empresa_id: string;
   empresa_nome: string;
+  empresa_slug: string;
   vencidas_qtd: number;
   vencidas_valor: number;
+  semana_qtd: number;
   semana_valor: number;
+  mes_qtd: number;
   mes_valor: number;
+  aberto_qtd: number;
   aberto_valor: number;
-}
-
-interface DistribuicaoTemporal {
-  hoje: number;
-  d3: number;
-  d7: number;
-  d15: number;
-  d30: number;
+  pago_mes_qtd: number;
+  pago_mes_valor: number;
 }
 
 export interface DashboardGeralData {
-  alertas: Alertas;
+  grupo: GrupoKpis;
   por_empresa: EmpresaResumo[];
-  distribuicao_temporal: DistribuicaoTemporal;
 }
 
 export function useDashboardGeral() {
