@@ -28,9 +28,10 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
   };
 
   const menuItems = [
+    { id: 'dashboard-geral', label: 'Visao Geral' },
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'contas', label: 'Contas a Pagar' },
-    { id: 'relatorios', label: 'Relatórios' },
+    { id: 'relatorios', label: 'Relatorios' },
   ];
 
   return (
