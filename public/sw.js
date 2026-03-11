@@ -3,12 +3,14 @@ const CACHE_NAME = 'contas-em-dia-v1';
 const STATIC_CACHE = 'static-cache-v1';
 const DYNAMIC_CACHE = 'dynamic-cache-v1';
 
+const resolveScopedPath = (relativePath) => new URL(relativePath, self.registration.scope).pathname;
+
 const STATIC_FILES = [
-  '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/index.css',
-  '/manifest.json'
+  resolveScopedPath('./'),
+  resolveScopedPath('./index.html'),
+  resolveScopedPath('./manifest.json'),
+  resolveScopedPath('./icon-192x192.png'),
+  resolveScopedPath('./icon-512x512.png')
 ];
 
 // Instalar Service Worker
@@ -128,7 +130,7 @@ async function syncContas() {
     // Notificar usuário
     self.registration.showNotification('Dados sincronizados!', {
       body: 'Todas as alterações foram salvas na nuvem.',
-      icon: '/icon-192x192.png'
+      icon: new URL('./icon-192x192.png', self.registration.scope).href
     });
   } catch (error) {
     console.error('Erro na sincronização:', error);

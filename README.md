@@ -32,6 +32,26 @@ npm install
 npm run dev
 ```
 
+## 🌐 Uso Fora do Lovable
+
+Este projeto roda de forma independente como aplicação web estática.
+
+### Rodar em qualquer máquina
+
+```bash
+npm install
+npm run build
+npm run preview
+```
+
+### Publicação automática no GitHub Pages
+
+O workflow em `.github/workflows/deploy-pages.yml` publica automaticamente no GitHub Pages a cada push na branch `main`.
+
+URL esperada:
+
+`https://<seu-usuario>.github.io/contas-em-dia-online/`
+
 ## 📞 Suporte
 
 Para dúvidas sobre funcionalidades offline, acesse o "Instalador Offline" no sistema.
