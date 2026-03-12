@@ -20,6 +20,7 @@ import {
   useRelatorioFornecedor,
 } from '@/hooks/useRelatorios';
 import { formatCurrency, formatDate } from '@/lib/formatters';
+import { toLocalISODate } from '@/lib/date';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
@@ -30,8 +31,8 @@ function getDefaultDates() {
   const ini = new Date(now.getFullYear(), now.getMonth(), 1);
   const fim = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return {
-    dataIni: ini.toISOString().split('T')[0],
-    dataFim: fim.toISOString().split('T')[0],
+    dataIni: toLocalISODate(ini),
+    dataFim: toLocalISODate(fim),
   };
 }
 

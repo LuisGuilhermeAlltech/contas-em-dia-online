@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useEffect, useMemo, useState, ReactNode } from 'react';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useAppStore, COMPANIES } from '@/store/appStore';
+import { useAppStore } from '@/store/appStore';
+import { useEmpresas } from '@/hooks/useEmpresas';
 import { PortalProvider } from '@/components/providers/PortalProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -21,11 +22,40 @@ interface AppShellProps {
 export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { selectedCompanyId, selectedCompanyName, setCompany } = useAppStore();
+  const { data: empresas = [] } = useEmpresas();
+
+  const companyOptions = useMemo(
+    () =>
+      empresas
+        .filter((empresa) => !!empresa.slug)
+        .map((empresa) => ({
+          id: empresa.slug!,
+          name: empresa.nome,
+        })),
+    [empresas]
+  );
+
+  const selectedCompany = companyOptions.find((company) => company.id === selectedCompanyId);
 
   const handleCompanyChange = (value: string) => {
-    const name = COMPANIES[value as keyof typeof COMPANIES];
-    setCompany(value, name);
+    const company = companyOptions.find((item) => item.id === value);
+    if (!company) return;
+    setCompany(company.id, company.name);
   };
+
+  useEffect(() => {
+    if (!companyOptions.length) return;
+
+    if (!selectedCompany) {
+      const firstCompany = companyOptions[0];
+      setCompany(firstCompany.id, firstCompany.name);
+      return;
+    }
+
+    if (selectedCompany.name !== selectedCompanyName) {
+      setCompany(selectedCompany.id, selectedCompany.name);
+    }
+  }, [companyOptions, selectedCompany, selectedCompanyName, setCompany]);
 
   const menuItems = [
     { id: 'dashboard-geral', label: 'Visao Geral' },
@@ -63,14 +93,14 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
                   <span className="notranslate" translate="no">Empresa</span>
                 </label>
-                <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
+                <Select value={selectedCompany?.id} onValueChange={handleCompanyChange}>
                   <SelectTrigger className="w-full notranslate" translate="no">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="notranslate" translate="no">
-                    {Object.entries(COMPANIES).map(([id, name]) => (
-                      <SelectItem key={id} value={id}>
-                        <span className="notranslate" translate="no">{name}</span>
+                    {companyOptions.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        <span className="notranslate" translate="no">{company.name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -105,7 +135,9 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
                 Sistema de Controle Financeiro
               </h2>
               <div className="text-sm text-muted-foreground">
-                <span className="notranslate" translate="no">{selectedCompanyName}</span>
+                <span className="notranslate" translate="no">
+                  {selectedCompany?.name || selectedCompanyName || 'Sem empresa selecionada'}
+                </span>
               </div>
             </div>
           </header>

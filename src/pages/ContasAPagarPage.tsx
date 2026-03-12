@@ -22,17 +22,24 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Plus, Pencil, Trash2, DollarSign, Eye, Paperclip, FileCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 import { useAppStore } from '@/store/appStore';
 import { formatCurrency, formatDate } from '@/lib/formatters';
+import { getTodayLocalISODate } from '@/lib/date';
+import { isContaEmAberto, normalizeContaStatus } from '@/lib/finance';
 import { toast } from 'sonner';
 import MultiVencimentosForm, { Vencimento } from '@/components/contas/MultiVencimentosForm';
 import { ComprovanteUpload } from '@/components/contas/ComprovanteUpload';
 import { ComprovanteViewer } from '@/components/contas/ComprovanteViewer';
 import { useComprovantes } from '@/hooks/useComprovantes';
+import { useEmpresaId } from '@/hooks/useEmpresas';
+
+type ContaView = Tables<'contas_view'>;
 
 export default function ContasAPagarPage() {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useAppStore();
+  const empresaUuid = useEmpresaId(selectedCompanyId);
 
   const [somenteAbertas, setSomenteAbertas] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -77,8 +84,19 @@ export default function ContasAPagarPage() {
   const [historicoDialog, setHistoricoDialog] = useState(false);
   const [historico, setHistorico] = useState<any[]>([]);
 
+  const invalidateFinancialQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-empresa'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-geral'] });
+    queryClient.invalidateQueries({ queryKey: ['contas-vencidas-hoje-v2'] });
+    queryClient.invalidateQueries({ queryKey: ['relatorio-fluxo'] });
+    queryClient.invalidateQueries({ queryKey: ['relatorio-categoria'] });
+    queryClient.invalidateQueries({ queryKey: ['relatorio-forma-pagamento'] });
+    queryClient.invalidateQueries({ queryKey: ['relatorio-fornecedor'] });
+  };
+
   // Buscar contas
-  const { data: contas = [], isLoading } = useQuery({
+  const { data: contas = [], isLoading } = useQuery<ContaView[]>({
     queryKey: ['contas', selectedCompanyId, somenteAbertas, statusFilter, searchTerm, periodoInicio, periodoFim],
     queryFn: async () => {
       let query = supabase
@@ -103,24 +121,23 @@ export default function ContasAPagarPage() {
       if (error) throw error;
       
       let result = data || [];
+      const hoje = getTodayLocalISODate();
       
       // Filtrar por status manualmente
       if (somenteAbertas) {
-        result = result.filter(c => c.status !== 'Pago');
+        result = result.filter((conta) => isContaEmAberto(conta.status));
       }
       
       if (statusFilter !== 'all') {
         if (statusFilter === 'pendente') {
-          result = result.filter(c => c.status === 'Pendente');
+          result = result.filter((conta) => isContaEmAberto(conta.status));
         } else if (statusFilter === 'vencida') {
-          result = result.filter(c => {
-            const venc = new Date(c.vencimento + 'T00:00:00');
-            const hoje = new Date();
-            hoje.setHours(0, 0, 0, 0);
-            return c.status !== 'Pago' && venc < hoje;
+          result = result.filter((conta) => {
+            const vencimento = conta.vencimento || '';
+            return isContaEmAberto(conta.status) && vencimento < hoje;
           });
         } else if (statusFilter === 'paga') {
-          result = result.filter(c => c.status === 'Pago');
+          result = result.filter((conta) => normalizeContaStatus(conta.status) === 'paga');
         }
       }
       
@@ -146,6 +163,10 @@ export default function ContasAPagarPage() {
   // Mutation: criar conta
   const criarContaMutation = useMutation({
     mutationFn: async (dados: any) => {
+      if (!empresaUuid) {
+        throw new Error('Empresa não identificada');
+      }
+
       // Se há múltiplos vencimentos
       if (dados.vencimentos && dados.vencimentos.length > 1) {
         const grupoId = crypto.randomUUID();
@@ -154,6 +175,7 @@ export default function ContasAPagarPage() {
           valor_total: Number(dados.valor_original),
           vencimento: venc.data,
           empresa: selectedCompanyId,
+          empresa_id: empresaUuid,
           total_pago: 0,
           parcela_numero: venc.parcela,
           total_parcelas: dados.vencimentos.length,
@@ -170,6 +192,7 @@ export default function ContasAPagarPage() {
           valor_total: Number(dados.valor_original),
           vencimento: dados.data_vencimento,
           empresa: selectedCompanyId,
+          empresa_id: empresaUuid,
           total_pago: 0,
           parcela_numero: 1,
           total_parcelas: 1,
@@ -186,8 +209,7 @@ export default function ContasAPagarPage() {
       } else {
         toast.success('Conta criada com sucesso');
       }
-      queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo', selectedCompanyId] });
+      invalidateFinancialQueries();
       setDialogNova(false);
       setNovaConta({ descricao: '', valor_original: '', data_vencimento: '', codigo_barras: '' });
       setVencimentos([]);
@@ -205,7 +227,7 @@ export default function ContasAPagarPage() {
         .insert({
           conta_id: contaId,
           valor,
-          data: new Date().toISOString().split('T')[0],
+          data: getTodayLocalISODate(),
         })
         .select('id')
         .single();
@@ -226,8 +248,7 @@ export default function ContasAPagarPage() {
     },
     onSuccess: () => {
       toast.success('Pagamento registrado');
-      queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo', selectedCompanyId] });
+      invalidateFinancialQueries();
       setPagamentoDialog(false);
       setValorPagamento('');
       setContaSelecionada(null);
@@ -254,7 +275,7 @@ export default function ContasAPagarPage() {
     },
     onSuccess: () => {
       toast.success('Conta atualizada');
-      queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
+      invalidateFinancialQueries();
       setEditDialog(false);
       setContaEdit(null);
     },
@@ -274,9 +295,7 @@ export default function ContasAPagarPage() {
     },
     onSuccess: () => {
       toast.success('Conta excluída');
-      queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo', selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ['total-hoje', selectedCompanyId] });
+      invalidateFinancialQueries();
     },
     onError: () => {
       toast.error('Erro ao excluir conta');
@@ -303,9 +322,7 @@ export default function ContasAPagarPage() {
       toast.success('Pagamento excluído');
       // Atualiza o histórico local
       setHistorico(prev => prev.filter(p => p.id !== excluirPagamentoMutation.variables));
-      queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo', selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ['total-hoje', selectedCompanyId] });
+      invalidateFinancialQueries();
     },
     onError: () => {
       toast.error('Erro ao excluir pagamento');
@@ -343,9 +360,9 @@ export default function ContasAPagarPage() {
     }
   };
 
-  const handlePagar = (conta: any) => {
+  const handlePagar = (conta: ContaView) => {
     setContaSelecionada(conta);
-    setValorPagamento(String(conta.saldo || 0));
+    setValorPagamento(String(Number(conta.saldo) || 0));
     setPagamentoDialog(true);
   };
 
@@ -390,22 +407,19 @@ export default function ContasAPagarPage() {
     setAnexarDialog(true);
   };
 
-  const handleEditar = (conta: any) => {
+  const handleEditar = async (conta: ContaView) => {
     setContaEdit(conta);
-    // Buscar codigo_barras da tabela contas
-    supabase.from('contas').select('codigo_barras').eq('id', conta.id).single().then(({ data }) => {
-      setEditForm({
-        descricao: conta.descricao || '',
-        valor_original: String(conta.valor_total || ''),
-        data_vencimento: conta.vencimento || '',
-        codigo_barras: data?.codigo_barras || '',
-      });
-    });
+    const { data } = await supabase
+      .from('contas')
+      .select('codigo_barras')
+      .eq('id', conta.id as string)
+      .single();
+
     setEditForm({
       descricao: conta.descricao || '',
       valor_original: String(conta.valor_total || ''),
       data_vencimento: conta.vencimento || '',
-      codigo_barras: '',
+      codigo_barras: data?.codigo_barras || '',
     });
     setEditDialog(true);
   };
@@ -424,7 +438,7 @@ export default function ContasAPagarPage() {
     }
   };
 
-  const handleVerHistorico = async (conta: any) => {
+  const handleVerHistorico = async (conta: ContaView) => {
     const { data, error } = await supabase
       .from('pagamentos')
       .select('*')
@@ -441,7 +455,9 @@ export default function ContasAPagarPage() {
     setHistoricoDialog(true);
   };
 
-  const totalAberto = contas.reduce((sum, c) => sum + (Number(c.saldo) || 0), 0);
+  const totalAberto = contas.reduce((sum, c) => {
+    return isContaEmAberto(c.status) ? sum + (Number(c.saldo) || 0) : sum;
+  }, 0);
 
   if (isLoading) {
     return (
@@ -607,63 +623,73 @@ export default function ContasAPagarPage() {
                 </tr>
               </thead>
               <tbody>
-                {contas.map((conta) => (
-                  <tr key={conta.id} className="border-b hover:bg-muted/50">
-                    <td className="p-2">{formatDate(conta.vencimento)}</td>
-                    <td className="p-2">-</td>
-                    <td className="p-2">{conta.descricao}</td>
-                    <td className="p-2 text-right">{formatCurrency(Number(conta.valor_total) || 0)}</td>
-                    <td className="p-2 text-right">
-                      {formatCurrency(Number(conta.total_pago) || 0)}
-                    </td>
-                    <td className="p-2 text-right font-bold">
-                      {formatCurrency(Number(conta.saldo) || 0)}
-                    </td>
-                    <td className="p-2 text-center">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-semibold ${
-                          conta.status === 'Pago'
-                            ? 'bg-green-100 text-green-800'
-                            : conta.status === 'Parcial'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-orange-100 text-orange-800'
-                        }`}
-                      >
-                        {conta.status}
-                      </span>
-                    </td>
-                    <td className="p-2 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {conta.status !== 'Pago' && (
+                {contas.map((conta) => {
+                  const statusNormalizado = normalizeContaStatus(conta.status);
+                  const statusLabel =
+                    statusNormalizado === 'paga'
+                      ? 'Pago'
+                      : statusNormalizado === 'parcial'
+                      ? 'Parcial'
+                      : 'Pendente';
+
+                  return (
+                    <tr key={conta.id} className="border-b hover:bg-muted/50">
+                      <td className="p-2">{formatDate(conta.vencimento)}</td>
+                      <td className="p-2">-</td>
+                      <td className="p-2">{conta.descricao}</td>
+                      <td className="p-2 text-right">{formatCurrency(Number(conta.valor_total) || 0)}</td>
+                      <td className="p-2 text-right">
+                        {formatCurrency(Number(conta.total_pago) || 0)}
+                      </td>
+                      <td className="p-2 text-right font-bold">
+                        {formatCurrency(Number(conta.saldo) || 0)}
+                      </td>
+                      <td className="p-2 text-center">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-semibold ${
+                            statusNormalizado === 'paga'
+                              ? 'bg-green-100 text-green-800'
+                              : statusNormalizado === 'parcial'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-orange-100 text-orange-800'
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </td>
+                      <td className="p-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {isContaEmAberto(conta.status) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handlePagar(conta)}
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost" onClick={() => void handleEditar(conta)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handlePagar(conta)}
+                            onClick={() => handleVerHistorico(conta)}
                           >
-                            <DollarSign className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Button>
-                        )}
-                        <Button size="sm" variant="ghost" onClick={() => handleEditar(conta)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleVerHistorico(conta)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleExcluir(conta.id as string)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleExcluir(conta.id as string)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

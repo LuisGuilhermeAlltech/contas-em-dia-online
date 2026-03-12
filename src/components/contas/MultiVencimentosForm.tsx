@@ -12,6 +12,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from 'lucide-react';
 import { addMonths, lastDayOfMonth, getDate, setDate } from 'date-fns';
+import { toLocalISODate } from '@/lib/date';
 
 export interface Vencimento {
   parcela: number;
@@ -49,7 +50,7 @@ export default function MultiVencimentosForm({ onVencimentosChange }: MultiVenci
         dataVencimento = setDate(dataVencimento, diaBase);
       }
 
-      const dataFormatada = dataVencimento.toISOString().split('T')[0];
+      const dataFormatada = toLocalISODate(dataVencimento);
       novosVencimentos.push({
         parcela: i + 1,
         data: dataFormatada,

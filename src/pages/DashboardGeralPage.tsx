@@ -1,8 +1,8 @@
 import { CardKpi } from '@/components/dashboard/CardKpi';
 import { CompanySummaryCard } from '@/components/dashboard/CompanySummaryCard';
-import { useDashboardGeral } from '@/hooks/useDashboardGeral';
+import { EmpresaResumo, useDashboardGeral } from '@/hooks/useDashboardGeral';
 import { formatCurrency } from '@/lib/formatters';
-import { useAppStore, COMPANIES } from '@/store/appStore';
+import { useAppStore } from '@/store/appStore';
 
 interface DashboardGeralPageProps {
   onNavigate?: (menu: string) => void;
@@ -22,11 +22,9 @@ export default function DashboardGeralPage({ onNavigate }: DashboardGeralPagePro
 
   const { grupo, por_empresa } = data;
 
-  const handleViewDetails = (slug: string) => {
-    const companyName = COMPANIES[slug as keyof typeof COMPANIES];
-    if (companyName) {
-      setCompany(slug, companyName);
-    }
+  const handleViewDetails = (empresa: EmpresaResumo) => {
+    if (!empresa.empresa_slug) return;
+    setCompany(empresa.empresa_slug, empresa.empresa_nome);
     onNavigate?.('dashboard');
   };
 
@@ -64,11 +62,15 @@ export default function DashboardGeralPage({ onNavigate }: DashboardGeralPagePro
 
       {/* BLOCO 2 — Per-Company Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {por_empresa.map((empresa: any) => (
+        {por_empresa.map((empresa) => (
           <CompanySummaryCard
             key={empresa.empresa_id}
             data={empresa}
-            onViewDetails={handleViewDetails}
+            onViewDetails={
+              empresa.empresa_slug
+                ? () => handleViewDetails(empresa)
+                : undefined
+            }
           />
         ))}
       </div>

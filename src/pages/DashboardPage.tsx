@@ -6,8 +6,19 @@ import { useAppStore } from '@/store/appStore';
 import { useEmpresaId } from '@/hooks/useEmpresas';
 import { useDashboardEmpresa } from '@/hooks/useDashboardEmpresa';
 import { formatCurrency, formatDate } from '@/lib/formatters';
+import { getTodayLocalISODate, toLocalISODate } from '@/lib/date';
+import { calcSaldo } from '@/lib/finance';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+
+interface ContaVencimento {
+  id: string;
+  descricao: string;
+  vencimento: string;
+  saldo: number;
+  is_vencido: boolean;
+  is_hoje: boolean;
+}
 
 export default function DashboardPage() {
   const { selectedCompanyId } = useAppStore();
@@ -18,9 +29,9 @@ export default function DashboardPage() {
   // Contas vencidas e vencendo hoje (usa RPC antiga com empresa text)
   const { data: contasVencidasHoje = [] } = useQuery({
     queryKey: ['contas-vencidas-hoje-v2', empresaUuid, mostrar3dias],
-    queryFn: async () => {
+    queryFn: async (): Promise<ContaVencimento[]> => {
       // Query direto para ter mais controle
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = getTodayLocalISODate();
       let query = supabase
         .from('contas')
         .select('id, descricao, vencimento, valor_total, total_pago, status')
@@ -33,17 +44,17 @@ export default function DashboardPage() {
       if (mostrar3dias) {
         const d3 = new Date();
         d3.setDate(d3.getDate() + 3);
-        query = query.lte('vencimento', d3.toISOString().split('T')[0]);
+        query = query.lte('vencimento', toLocalISODate(d3));
       } else {
         query = query.lte('vencimento', hoje);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []).map((c: any) => ({
+      return (data || []).map((c) => ({
         ...c,
-        saldo: Number(c.valor_total) - Number(c.total_pago || 0),
-        is_vencido: c.vencimento < hoje,
+        saldo: calcSaldo(c.valor_total, c.total_pago),
+        is_vencido: (c.vencimento || '') < hoje,
         is_hoje: c.vencimento === hoje,
       }));
     },
@@ -126,7 +137,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {contasVencidasHoje.map((conta: any) => (
+                  {contasVencidasHoje.map((conta) => (
                     <tr
                       key={conta.id}
                       className={`border-b hover:bg-muted/50 ${
@@ -146,7 +157,7 @@ export default function DashboardPage() {
                               : 'bg-muted text-muted-foreground'
                           }`}
                         >
-                          {conta.is_vencido ? 'Vencido' : conta.is_hoje ? 'Vence Hoje' : 'Proximo'}
+                          {conta.is_vencido ? 'Vencido' : conta.is_hoje ? 'Vence Hoje' : 'Próximo'}
                         </span>
                       </td>
                     </tr>

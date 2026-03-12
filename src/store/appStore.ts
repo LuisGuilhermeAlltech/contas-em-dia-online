@@ -11,18 +11,11 @@ interface AppState {
   closeAllOverlays: () => void;
 }
 
-const COMPANIES = {
-  'alltech-matriz': 'AllTech Matriz',
-  'alltech-filial': 'AllTech Filial',
-  'grupo-lider': 'Grupo Líder',
-  'luis-guilherme': 'Luis Guilherme',
-};
-
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      selectedCompanyId: 'alltech-matriz',
-      selectedCompanyName: 'AllTech Matriz',
+      selectedCompanyId: '',
+      selectedCompanyName: '',
       overlaysOpen: new Set<string>(),
       setCompany: (id: string, name: string) => {
         // Close all overlays before switching company
@@ -56,5 +49,3 @@ export const useAppStore = create<AppState>()(
     }
   )
 );
-
-export { COMPANIES };

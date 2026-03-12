@@ -21,7 +21,7 @@ interface CompanyData {
 
 interface CompanySummaryCardProps {
   data: CompanyData;
-  onViewDetails?: (slug: string) => void;
+  onViewDetails?: () => void;
 }
 
 function getStatusIndicator(data: CompanyData) {
@@ -105,7 +105,7 @@ export function CompanySummaryCard({ data, onViewDetails }: CompanySummaryCardPr
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => onViewDetails(data.empresa_slug)}
+              onClick={onViewDetails}
             >
               Ver detalhes
             </Button>
