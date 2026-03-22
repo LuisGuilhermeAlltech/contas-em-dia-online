@@ -4,7 +4,6 @@ import DashboardGeralPage from "./DashboardGeralPage";
 import DashboardPage from "./DashboardPage";
 import ContasAPagarPage from "./ContasAPagarPage";
 import RelatoriosPage from "./RelatoriosPage";
-import AgendaPomodoroPage from "./AgendaPomodoroPage";
 
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard-geral");
@@ -17,8 +16,6 @@ const Index = () => {
         return <DashboardPage />;
       case "contas":
         return <ContasAPagarPage />;
-      case "agenda":
-        return <AgendaPomodoroPage />;
       case "relatorios":
         return <RelatoriosPage />;
       default:

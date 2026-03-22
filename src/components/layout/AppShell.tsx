@@ -12,7 +12,6 @@ import { useAppStore } from '@/store/appStore';
 import { useEmpresas } from '@/hooks/useEmpresas';
 import { PortalProvider } from '@/components/providers/PortalProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useOffline } from '@/hooks/useOffline';
 
 interface AppShellProps {
   children: ReactNode;
@@ -24,7 +23,6 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { selectedCompanyId, selectedCompanyName, setCompany } = useAppStore();
   const { data: empresas = [] } = useEmpresas();
-  const { isOnline } = useOffline();
 
   const companyOptions = useMemo(
     () =>
@@ -63,7 +61,6 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
     { id: 'dashboard-geral', label: 'Visao Geral' },
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'contas', label: 'Contas a Pagar' },
-    { id: 'agenda', label: 'Agenda' },
     { id: 'relatorios', label: 'Relatorios' },
   ];
 
@@ -137,16 +134,7 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
               <h2 className="text-2xl font-bold text-foreground">
                 Sistema de Controle Financeiro
               </h2>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <span
-                  className={`inline-flex h-7 items-center rounded-full px-2 text-xs font-medium ${
-                    isOnline
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
-                  }`}
-                >
-                  {isOnline ? 'Online' : 'Offline'}
-                </span>
+              <div className="text-sm text-muted-foreground">
                 <span className="notranslate" translate="no">
                   {selectedCompany?.name || selectedCompanyName || 'Sem empresa selecionada'}
                 </span>
