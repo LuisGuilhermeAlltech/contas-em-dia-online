@@ -1,7 +1,7 @@
 // Service Worker para funcionalidade offline
-const CACHE_NAME = 'contas-em-dia-v1';
-const STATIC_CACHE = 'static-cache-v1';
-const DYNAMIC_CACHE = 'dynamic-cache-v1';
+const CACHE_VERSION = 'v2-20260322';
+const STATIC_CACHE = `static-cache-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `dynamic-cache-${CACHE_VERSION}`;
 
 const resolveScopedPath = (relativePath) => new URL(relativePath, self.registration.scope).pathname;
 
@@ -22,6 +22,7 @@ self.addEventListener('install', (event) => {
         console.log('Cacheando arquivos estáticos');
         return cache.addAll(STATIC_FILES);
       })
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -36,18 +37,40 @@ self.addEventListener('activate', (event) => {
             console.log('Removendo cache antigo:', cacheName);
             return caches.delete(cacheName);
           }
+          return Promise.resolve(undefined);
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
 // Interceptar requisições
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  const url = new URL(request.url);
+
+  // Navegação do app shell - Network First
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const responseClone = response.clone();
+          caches.open(DYNAMIC_CACHE).then((cache) => {
+            cache.put(request, responseClone);
+          });
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          return caches.match(resolveScopedPath('./index.html'));
+        })
+    );
+    return;
+  }
   
   // Estratégia para arquivos estáticos - Cache First
-  if (STATIC_FILES.includes(new URL(request.url).pathname)) {
+  if (STATIC_FILES.includes(url.pathname)) {
     event.respondWith(
       caches.match(request)
         .then((response) => {
@@ -88,21 +111,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Estratégia padrão - Network First
+  // Estratégia padrão - Stale While Revalidate para assets
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        const responseClone = response.clone();
-        caches.open(DYNAMIC_CACHE)
-          .then((cache) => {
+    caches.match(request).then((cachedResponse) => {
+      const networkFetch = fetch(request)
+        .then((response) => {
+          const responseClone = response.clone();
+          caches.open(DYNAMIC_CACHE).then((cache) => {
             cache.put(request, responseClone);
           });
-        return response;
-      })
-      .catch(() => {
-        return caches.match(request);
-      })
+          return response;
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || networkFetch;
+    })
   );
+});
+
+// Permite que a página peça atualização imediata do SW
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Background Sync
