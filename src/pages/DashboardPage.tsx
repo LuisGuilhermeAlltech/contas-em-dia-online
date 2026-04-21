@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CardKpi } from '@/components/dashboard/CardKpi';
 import { useAppStore } from '@/store/appStore';
-import { useEmpresaId } from '@/hooks/useEmpresas';
+import { useSelectedCompanyScope } from '@/hooks/useEmpresas';
 import { useDashboardEmpresa } from '@/hooks/useDashboardEmpresa';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { getTodayLocalISODate, toLocalISODate } from '@/lib/date';
@@ -15,6 +15,7 @@ interface ContaVencimento {
   id: string;
   descricao: string;
   vencimento: string;
+  empresa: string | null;
   saldo: number;
   is_vencido: boolean;
   is_hoje: boolean;
@@ -22,24 +23,33 @@ interface ContaVencimento {
 
 export default function DashboardPage() {
   const { selectedCompanyId } = useAppStore();
-  const empresaUuid = useEmpresaId(selectedCompanyId);
-  const { data: dash, isLoading } = useDashboardEmpresa(empresaUuid);
+  const {
+    selectedEmpresaIds,
+    isGroupSelection,
+    slugToName,
+  } = useSelectedCompanyScope(selectedCompanyId);
+  const { data: dash, isLoading } = useDashboardEmpresa(selectedEmpresaIds);
   const [mostrar3dias, setMostrar3dias] = useState(false);
 
   // Contas vencidas e vencendo hoje (usa RPC antiga com empresa text)
   const { data: contasVencidasHoje = [] } = useQuery({
-    queryKey: ['contas-vencidas-hoje-v2', empresaUuid, mostrar3dias],
+    queryKey: ['contas-vencidas-hoje-v2', selectedEmpresaIds, mostrar3dias],
     queryFn: async (): Promise<ContaVencimento[]> => {
       // Query direto para ter mais controle
       const hoje = getTodayLocalISODate();
       let query = supabase
         .from('contas')
-        .select('id, descricao, vencimento, valor_total, total_pago, status')
-        .eq('empresa_id', empresaUuid!)
+        .select('id, descricao, vencimento, valor_total, total_pago, status, empresa')
         .eq('status', 'pendente')
         .is('deleted_at', null)
         .order('vencimento', { ascending: true })
         .limit(15);
+
+      if (selectedEmpresaIds.length === 1) {
+        query = query.eq('empresa_id', selectedEmpresaIds[0]);
+      } else {
+        query = query.in('empresa_id', selectedEmpresaIds);
+      }
 
       if (mostrar3dias) {
         const d3 = new Date();
@@ -58,7 +68,7 @@ export default function DashboardPage() {
         is_hoje: c.vencimento === hoje,
       }));
     },
-    enabled: !!empresaUuid,
+    enabled: selectedEmpresaIds.length > 0,
   });
 
   if (isLoading || !dash) {
@@ -131,6 +141,7 @@ export default function DashboardPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-2 text-sm">Descricao</th>
+                    {isGroupSelection && <th className="text-left p-2 text-sm">Loja</th>}
                     <th className="text-left p-2 text-sm">Vencimento</th>
                     <th className="text-right p-2 text-sm">Valor em Aberto</th>
                     <th className="text-center p-2 text-sm">Status</th>
@@ -145,6 +156,11 @@ export default function DashboardPage() {
                       }`}
                     >
                       <td className="p-2">{conta.descricao}</td>
+                      {isGroupSelection && (
+                        <td className="p-2">
+                          {slugToName.get(conta.empresa || '') || conta.empresa || '-'}
+                        </td>
+                      )}
                       <td className="p-2">{formatDate(conta.vencimento)}</td>
                       <td className="p-2 text-right">{formatCurrency(conta.saldo)}</td>
                       <td className="p-2 text-center">

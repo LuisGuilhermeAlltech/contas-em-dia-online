@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, ReactNode } from 'react';
+import { useEffect, useState, ReactNode } from 'react';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAppStore } from '@/store/appStore';
-import { useEmpresas } from '@/hooks/useEmpresas';
+import { useCompanyOptions } from '@/hooks/useEmpresas';
 import { PortalProvider } from '@/components/providers/PortalProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -22,18 +22,7 @@ interface AppShellProps {
 export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { selectedCompanyId, selectedCompanyName, setCompany } = useAppStore();
-  const { data: empresas = [] } = useEmpresas();
-
-  const companyOptions = useMemo(
-    () =>
-      empresas
-        .filter((empresa) => !!empresa.slug)
-        .map((empresa) => ({
-          id: empresa.slug!,
-          name: empresa.nome,
-        })),
-    [empresas]
-  );
+  const companyOptions = useCompanyOptions();
 
   const selectedCompany = companyOptions.find((company) => company.id === selectedCompanyId);
 
@@ -58,7 +47,6 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
   }, [companyOptions, selectedCompany, selectedCompanyName, setCompany]);
 
   const menuItems = [
-    { id: 'dashboard-geral', label: 'Visao Geral' },
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'contas', label: 'Contas a Pagar' },
     { id: 'relatorios', label: 'Relatorios' },

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,22 +32,44 @@ import MultiVencimentosForm, { Vencimento } from '@/components/contas/MultiVenci
 import { ComprovanteUpload } from '@/components/contas/ComprovanteUpload';
 import { ComprovanteViewer } from '@/components/contas/ComprovanteViewer';
 import { useComprovantes } from '@/hooks/useComprovantes';
-import { useEmpresaId } from '@/hooks/useEmpresas';
+import { useSelectedCompanyScope } from '@/hooks/useEmpresas';
 
 type ContaView = Tables<'contas_view'>;
+type Pagamento = Tables<'pagamentos'>;
+
+interface ContaFormData {
+  descricao: string;
+  valor_original: string;
+  data_vencimento: string;
+  codigo_barras: string;
+}
+
+interface CriarContaPayload extends ContaFormData {
+  empresaSlug: string;
+  empresaId: string;
+  vencimentos?: Vencimento[];
+}
 
 export default function ContasAPagarPage() {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useAppStore();
-  const empresaUuid = useEmpresaId(selectedCompanyId);
+  const {
+    selectedOption,
+    selectedCompanySlugs,
+    stores,
+    slugToName,
+    isGroupSelection,
+  } = useSelectedCompanyScope(selectedCompanyId);
 
   const [somenteAbertas, setSomenteAbertas] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [lojaFilter, setLojaFilter] = useState('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [periodoInicio, setPeriodoInicio] = useState('');
   const [periodoFim, setPeriodoFim] = useState('');
+  const [novaContaLojaSlug, setNovaContaLojaSlug] = useState('');
 
-  const [novaConta, setNovaConta] = useState({
+  const [novaConta, setNovaConta] = useState<ContaFormData>({
     descricao: '',
     valor_original: '',
     data_vencimento: '',
@@ -57,7 +79,7 @@ export default function ContasAPagarPage() {
   const [dialogNova, setDialogNova] = useState(false);
 
   const [pagamentoDialog, setPagamentoDialog] = useState(false);
-  const [contaSelecionada, setContaSelecionada] = useState<any>(null);
+  const [contaSelecionada, setContaSelecionada] = useState<ContaView | null>(null);
   const [valorPagamento, setValorPagamento] = useState('');
   const [arquivoComprovante, setArquivoComprovante] = useState<File | null>(null);
   
@@ -67,14 +89,14 @@ export default function ContasAPagarPage() {
   
   // Anexar comprovante depois
   const [anexarDialog, setAnexarDialog] = useState(false);
-  const [pagamentoParaAnexar, setPagamentoParaAnexar] = useState<any>(null);
+  const [pagamentoParaAnexar, setPagamentoParaAnexar] = useState<Pagamento | null>(null);
   const [arquivoAnexar, setArquivoAnexar] = useState<File | null>(null);
   
-  const { uploadComprovante, uploading, getComprovanteByPagamento } = useComprovantes();
+  const { uploadComprovante, uploading } = useComprovantes();
 
   const [editDialog, setEditDialog] = useState(false);
-  const [contaEdit, setContaEdit] = useState<any>(null);
-  const [editForm, setEditForm] = useState({
+  const [contaEdit, setContaEdit] = useState<ContaView | null>(null);
+  const [editForm, setEditForm] = useState<ContaFormData>({
     descricao: '',
     valor_original: '',
     data_vencimento: '',
@@ -82,7 +104,25 @@ export default function ContasAPagarPage() {
   });
 
   const [historicoDialog, setHistoricoDialog] = useState(false);
-  const [historico, setHistorico] = useState<any[]>([]);
+  const [historico, setHistorico] = useState<Pagamento[]>([]);
+
+  useEffect(() => {
+    const firstStoreSlug = stores[0]?.slug || '';
+
+    setNovaContaLojaSlug((current) =>
+      stores.some((store) => store.slug === current) ? current : firstStoreSlug
+    );
+
+    if (!isGroupSelection) {
+      setLojaFilter('todas');
+      return;
+    }
+
+    setLojaFilter((current) => {
+      if (current === 'todas') return current;
+      return stores.some((store) => store.slug === current) ? current : 'todas';
+    });
+  }, [stores, isGroupSelection]);
 
   const invalidateFinancialQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
@@ -97,13 +137,29 @@ export default function ContasAPagarPage() {
 
   // Buscar contas
   const { data: contas = [], isLoading } = useQuery<ContaView[]>({
-    queryKey: ['contas', selectedCompanyId, somenteAbertas, statusFilter, searchTerm, periodoInicio, periodoFim],
+    queryKey: [
+      'contas',
+      selectedCompanyId,
+      somenteAbertas,
+      statusFilter,
+      lojaFilter,
+      searchTerm,
+      periodoInicio,
+      periodoFim,
+    ],
     queryFn: async () => {
+      if (!selectedCompanySlugs.length) return [];
+
       let query = supabase
         .from('contas_view')
         .select('*')
-        .eq('empresa', selectedCompanyId)
         .order('vencimento', { ascending: true });
+
+      if (selectedCompanySlugs.length === 1) {
+        query = query.eq('empresa', selectedCompanySlugs[0]);
+      } else {
+        query = query.in('empresa', selectedCompanySlugs);
+      }
 
       if (searchTerm.trim()) {
         query = query.ilike('descricao', `%${searchTerm}%`);
@@ -140,33 +196,19 @@ export default function ContasAPagarPage() {
           result = result.filter((conta) => normalizeContaStatus(conta.status) === 'paga');
         }
       }
+
+      if (isGroupSelection && lojaFilter !== 'todas') {
+        result = result.filter((conta) => conta.empresa === lojaFilter);
+      }
       
       return result;
     },
-    enabled: !!selectedCompanyId,
-  });
-
-  // Buscar fornecedores
-  const { data: fornecedores = [] } = useQuery({
-    queryKey: ['fornecedores', selectedCompanyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fornecedores')
-        .select('*')
-        .eq('empresa', selectedCompanyId);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!selectedCompanyId,
+    enabled: selectedCompanySlugs.length > 0,
   });
 
   // Mutation: criar conta
   const criarContaMutation = useMutation({
-    mutationFn: async (dados: any) => {
-      if (!empresaUuid) {
-        throw new Error('Empresa não identificada');
-      }
-
+    mutationFn: async (dados: CriarContaPayload) => {
       // Se há múltiplos vencimentos
       if (dados.vencimentos && dados.vencimentos.length > 1) {
         const grupoId = crypto.randomUUID();
@@ -174,8 +216,8 @@ export default function ContasAPagarPage() {
           descricao: dados.descricao,
           valor_total: Number(dados.valor_original),
           vencimento: venc.data,
-          empresa: selectedCompanyId,
-          empresa_id: empresaUuid,
+          empresa: dados.empresaSlug,
+          empresa_id: dados.empresaId,
           total_pago: 0,
           parcela_numero: venc.parcela,
           total_parcelas: dados.vencimentos.length,
@@ -191,8 +233,8 @@ export default function ContasAPagarPage() {
           descricao: dados.descricao,
           valor_total: Number(dados.valor_original),
           vencimento: dados.data_vencimento,
-          empresa: selectedCompanyId,
-          empresa_id: empresaUuid,
+          empresa: dados.empresaSlug,
+          empresa_id: dados.empresaId,
           total_pago: 0,
           parcela_numero: 1,
           total_parcelas: 1,
@@ -261,7 +303,7 @@ export default function ContasAPagarPage() {
 
   // Mutation: editar conta
   const editarContaMutation = useMutation({
-    mutationFn: async ({ id, dados }: { id: string; dados: any }) => {
+    mutationFn: async ({ id, dados }: { id: string; dados: ContaFormData }) => {
       const { error } = await supabase
         .from('contas')
         .update({
@@ -318,10 +360,10 @@ export default function ContasAPagarPage() {
         .eq('id', pagamentoId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, pagamentoId) => {
       toast.success('Pagamento excluído');
       // Atualiza o histórico local
-      setHistorico(prev => prev.filter(p => p.id !== excluirPagamentoMutation.variables));
+      setHistorico((prev) => prev.filter((pagamento) => pagamento.id !== pagamentoId));
       invalidateFinancialQueries();
     },
     onError: () => {
@@ -342,6 +384,25 @@ export default function ContasAPagarPage() {
       return;
     }
 
+    const empresaSlug = isGroupSelection
+      ? novaContaLojaSlug
+      : selectedCompanySlugs[0] || selectedCompanyId;
+
+    const empresaSelecionada = selectedOption?.stores.find(
+      (store) => store.slug === empresaSlug
+    );
+
+    if (!empresaSelecionada?.id || !empresaSelecionada.slug) {
+      toast.error('Selecione uma loja válida para criar a conta');
+      return;
+    }
+
+    const payloadBase: CriarContaPayload = {
+      ...novaConta,
+      empresaSlug: empresaSelecionada.slug,
+      empresaId: empresaSelecionada.id,
+    };
+
     // Se há múltiplos vencimentos, validá-los
     if (vencimentos.length > 1) {
       const vencimentosInvalidos = vencimentos.some(v => !v.data);
@@ -349,14 +410,14 @@ export default function ContasAPagarPage() {
         toast.error('Todas as datas de vencimento devem ser preenchidas');
         return;
       }
-      criarContaMutation.mutate({ ...novaConta, vencimentos });
+      criarContaMutation.mutate({ ...payloadBase, vencimentos });
     } else {
       // Vencimento único
       if (!novaConta.data_vencimento) {
         toast.error('Preencha a data de vencimento');
         return;
       }
-      criarContaMutation.mutate(novaConta);
+      criarContaMutation.mutate(payloadBase);
     }
   };
 
@@ -374,6 +435,10 @@ export default function ContasAPagarPage() {
     const valor = Number(valorPagamento);
     if (isNaN(valor) || valor <= 0) {
       toast.error('Valor inválido');
+      return;
+    }
+    if (!contaSelecionada.id) {
+      toast.error('Conta inválida');
       return;
     }
     pagarContaMutation.mutate({ contaId: contaSelecionada.id, valor, arquivo: arquivoComprovante });
@@ -401,7 +466,7 @@ export default function ContasAPagarPage() {
     setViewerOpen(true);
   };
 
-  const handleAbrirAnexar = (pagamento: any) => {
+  const handleAbrirAnexar = (pagamento: Pagamento) => {
     setPagamentoParaAnexar(pagamento);
     setArquivoAnexar(null);
     setAnexarDialog(true);
@@ -427,6 +492,10 @@ export default function ContasAPagarPage() {
   const handleSalvarEdicao = () => {
     if (!contaEdit || !editForm.descricao || !editForm.valor_original || !editForm.data_vencimento) {
       toast.error('Preencha todos os campos');
+      return;
+    }
+    if (!contaEdit.id) {
+      toast.error('Conta inválida');
       return;
     }
     editarContaMutation.mutate({ id: contaEdit.id, dados: editForm });
@@ -505,6 +574,24 @@ export default function ContasAPagarPage() {
                 />
               </div>
 
+              {isGroupSelection && (
+                <div>
+                  <Label>Loja</Label>
+                  <Select value={novaContaLojaSlug} onValueChange={setNovaContaLojaSlug}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a loja" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stores.map((store) => (
+                        <SelectItem key={store.id} value={store.slug}>
+                          {store.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {/* Campo de vencimento único - só aparece se não há múltiplos vencimentos */}
               {vencimentos.length <= 1 && (
                 <div>
@@ -555,7 +642,13 @@ export default function ContasAPagarPage() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div
+            className={
+              isGroupSelection
+                ? 'grid grid-cols-1 md:grid-cols-5 gap-4'
+                : 'grid grid-cols-1 md:grid-cols-4 gap-4'
+            }
+          >
             <div>
               <Label>Buscar</Label>
               <Input
@@ -564,6 +657,24 @@ export default function ContasAPagarPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            {isGroupSelection && (
+              <div>
+                <Label>Loja</Label>
+                <Select value={lojaFilter} onValueChange={setLojaFilter}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas</SelectItem>
+                    {stores.map((store) => (
+                      <SelectItem key={store.id} value={store.slug}>
+                        {store.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -613,6 +724,7 @@ export default function ContasAPagarPage() {
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">Vencimento</th>
+                  {isGroupSelection && <th className="text-left p-2">Loja</th>}
                   <th className="text-left p-2">Fornecedor</th>
                   <th className="text-left p-2">Descrição</th>
                   <th className="text-right p-2">Valor Original</th>
@@ -635,6 +747,11 @@ export default function ContasAPagarPage() {
                   return (
                     <tr key={conta.id} className="border-b hover:bg-muted/50">
                       <td className="p-2">{formatDate(conta.vencimento)}</td>
+                      {isGroupSelection && (
+                        <td className="p-2">
+                          {slugToName.get(conta.empresa || '') || conta.empresa || '-'}
+                        </td>
+                      )}
                       <td className="p-2">-</td>
                       <td className="p-2">{conta.descricao}</td>
                       <td className="p-2 text-right">{formatCurrency(Number(conta.valor_total) || 0)}</td>
