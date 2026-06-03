@@ -20,7 +20,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Pencil, Trash2, DollarSign, Eye, Paperclip, FileCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign, Eye, Paperclip, FileCheck, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { useAppStore } from '@/store/appStore';
@@ -371,6 +371,59 @@ export default function ContasAPagarPage() {
     },
   });
 
+  // Mutation: reabrir conta removendo todos os pagamentos vinculados
+  const reabrirContaMutation = useMutation({
+    mutationFn: async (contaId: string) => {
+      const { data: pagamentos, error: pagamentosError } = await supabase
+        .from('pagamentos')
+        .select('id')
+        .eq('conta_id', contaId);
+
+      if (pagamentosError) throw pagamentosError;
+
+      const pagamentoIds = (pagamentos || []).map((pagamento) => pagamento.id);
+
+      if (pagamentoIds.length > 0) {
+        const { data: comprovantes, error: comprovantesError } = await supabase
+          .from('comprovantes_pagamento')
+          .select('arquivo_url')
+          .in('pagamento_id', pagamentoIds);
+
+        if (comprovantesError) throw comprovantesError;
+
+        const arquivos = (comprovantes || [])
+          .map((comprovante) => comprovante.arquivo_url)
+          .filter(Boolean);
+
+        if (arquivos.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from('comprovantes-boletos')
+            .remove(arquivos);
+
+          if (storageError) {
+            console.warn('Falha ao remover arquivos de comprovante:', storageError);
+          }
+        }
+
+        const { error } = await supabase
+          .from('pagamentos')
+          .delete()
+          .eq('conta_id', contaId);
+
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success('Conta voltou para não paga');
+      setHistorico([]);
+      setHistoricoDialog(false);
+      invalidateFinancialQueries();
+    },
+    onError: () => {
+      toast.error('Erro ao voltar conta para não paga');
+    },
+  });
+
   const handleExcluirPagamento = (pagamentoId: string) => {
     if (confirm('Tem certeza que deseja excluir este pagamento? O saldo da conta será recalculado.')) {
       excluirPagamentoMutation.mutate(pagamentoId);
@@ -504,6 +557,21 @@ export default function ContasAPagarPage() {
   const handleExcluir = (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta conta?')) {
       excluirContaMutation.mutate(id);
+    }
+  };
+
+  const handleReabrirConta = (conta: ContaView) => {
+    if (!conta.id) {
+      toast.error('Conta inválida');
+      return;
+    }
+
+    if (
+      confirm(
+        'Voltar esta conta para não paga? Todos os pagamentos e comprovantes vinculados serão removidos, e o saldo voltará ao valor original.'
+      )
+    ) {
+      reabrirContaMutation.mutate(conta.id);
     }
   };
 
@@ -737,6 +805,7 @@ export default function ContasAPagarPage() {
               <tbody>
                 {contas.map((conta) => {
                   const statusNormalizado = normalizeContaStatus(conta.status);
+                  const temPagamento = Number(conta.total_pago) > 0;
                   const statusLabel =
                     statusNormalizado === 'paga'
                       ? 'Pago'
@@ -792,9 +861,21 @@ export default function ContasAPagarPage() {
                             size="sm"
                             variant="ghost"
                             onClick={() => handleVerHistorico(conta)}
+                            title="Ver histórico"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+                          {temPagamento && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleReabrirConta(conta)}
+                              title="Voltar para não paga"
+                              disabled={reabrirContaMutation.isPending}
+                            >
+                              <RotateCcw className="h-4 w-4 text-amber-600" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
