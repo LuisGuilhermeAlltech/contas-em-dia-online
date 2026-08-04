@@ -606,8 +606,8 @@ export default function ContasAPagarPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-w-0 space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-3xl font-bold text-foreground">Contas a Pagar</h2>
         <Dialog open={dialogNova} onOpenChange={setDialogNova}>
           <DialogTrigger asChild>
@@ -705,7 +705,7 @@ export default function ContasAPagarPage() {
       </div>
 
       {/* Filtros */}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
@@ -713,8 +713,8 @@ export default function ContasAPagarPage() {
           <div
             className={
               isGroupSelection
-                ? 'grid grid-cols-1 md:grid-cols-5 gap-4'
-                : 'grid grid-cols-1 md:grid-cols-4 gap-4'
+                ? 'grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 [&>*]:min-w-0'
+                : 'grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4 [&>*]:min-w-0'
             }
           >
             <div>
@@ -782,13 +782,13 @@ export default function ContasAPagarPage() {
       </Card>
 
       {/* Tabela */}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Contas ({contas.length})</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        <CardContent className="min-w-0">
+          <div className="w-full overflow-x-auto">
+            <table className={isGroupSelection ? 'w-full min-w-[1080px]' : 'w-full min-w-[960px]'}>
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">Vencimento</th>

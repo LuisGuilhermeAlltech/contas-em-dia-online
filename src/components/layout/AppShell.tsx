@@ -54,7 +54,7 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
 
   return (
     <PortalProvider companyId={selectedCompanyId}>
-      <div className="min-h-screen bg-background flex notranslate" translate="no">
+      <div className="min-h-screen overflow-x-hidden bg-background notranslate" translate="no">
         {/* Sidebar */}
         <aside
           className={`fixed left-0 top-0 z-40 h-screen transition-all duration-300 bg-card border-r ${
@@ -113,16 +113,18 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
 
         {/* Main content */}
         <div
-          className={`flex-1 transition-all duration-300 ${
-            sidebarOpen ? 'ml-64' : 'ml-16'
+          className={`min-h-screen min-w-0 transition-all duration-300 ${
+            sidebarOpen
+              ? 'ml-64 w-[calc(100%-16rem)]'
+              : 'ml-16 w-[calc(100%-4rem)]'
           }`}
         >
           <header className="bg-card shadow-sm border-b px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-foreground">
+            <div className="flex min-w-0 items-center justify-between gap-4">
+              <h2 className="min-w-0 text-2xl font-bold leading-tight text-foreground">
                 Sistema de Controle Financeiro
               </h2>
-              <div className="text-sm text-muted-foreground">
+              <div className="shrink-0 text-sm text-muted-foreground">
                 <span className="notranslate" translate="no">
                   {selectedCompany?.name || selectedCompanyName || 'Sem empresa selecionada'}
                 </span>
@@ -130,9 +132,9 @@ export const AppShell = ({ children, activeMenu, setActiveMenu }: AppShellProps)
             </div>
           </header>
 
-          <main className="p-6">
+          <main className="min-w-0 p-6">
             <ErrorBoundary>
-              <div key={selectedCompanyId}>
+              <div key={selectedCompanyId} className="min-w-0">
                 {children}
               </div>
             </ErrorBoundary>
