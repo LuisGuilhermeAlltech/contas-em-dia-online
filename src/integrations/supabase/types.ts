@@ -300,14 +300,34 @@ export type Database = {
     Views: {
       contas_view: {
         Row: {
+          categoria_id: string | null
+          centro_custo: string | null
+          codigo_barras: string | null
           created_at: string | null
+          data_emissao: string | null
+          data_pagamento: string | null
+          deleted_at: string | null
+          desconto: number | null
           descricao: string | null
           empresa: string | null
+          empresa_id: string | null
+          forma_pagamento: string | null
+          fornecedor_id: string | null
+          fornecedor_nome: string | null
+          grupo_parcela_id: string | null
           id: string | null
+          juros: number | null
+          multa: number | null
+          observacoes: string | null
           pagamentos_acumulados: number | null
+          parcela_numero: number | null
+          responsavel: string | null
           saldo: number | null
           status: string | null
+          tipo_conta: string | null
           total_pago: number | null
+          total_parcelas: number | null
+          updated_at: string | null
           valor_total: number | null
           vencimento: string | null
         }

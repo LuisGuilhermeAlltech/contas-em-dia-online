@@ -36,12 +36,167 @@ import { useSelectedCompanyScope } from '@/hooks/useEmpresas';
 
 type ContaView = Tables<'contas_view'>;
 type Pagamento = Tables<'pagamentos'>;
+type Fornecedor = Tables<'fornecedores'>;
+
+const FORNECEDOR_NONE = '__sem_fornecedor__';
+const fornecedorSelectColumns = 'id, nome, empresa, observacao, created_at';
+
+const normalizeFornecedorNome = (nome: string) =>
+  nome.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+
+const loadFornecedoresPorEmpresa = async (empresaSlug: string): Promise<Fornecedor[]> => {
+  if (!empresaSlug) return [];
+
+  const { data, error } = await supabase
+    .from('fornecedores')
+    .select(fornecedorSelectColumns)
+    .eq('empresa', empresaSlug)
+    .order('nome', { ascending: true });
+
+  if (error) throw error;
+  return (data || []) as Fornecedor[];
+};
+
+interface FornecedorPickerProps {
+  empresaSlug: string;
+  value: string;
+  onValueChange: (fornecedorId: string) => void;
+}
+
+function FornecedorPicker({ empresaSlug, value, onValueChange }: FornecedorPickerProps) {
+  const queryClient = useQueryClient();
+  const [adicionando, setAdicionando] = useState(false);
+  const [novoFornecedorNome, setNovoFornecedorNome] = useState('');
+
+  const { data: fornecedores = [], isLoading } = useQuery<Fornecedor[]>({
+    queryKey: ['fornecedores', empresaSlug],
+    queryFn: () => loadFornecedoresPorEmpresa(empresaSlug),
+    enabled: Boolean(empresaSlug),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const adicionarFornecedorMutation = useMutation({
+    mutationFn: async ({ nome, empresa }: { nome: string; empresa: string }) => {
+      const nomeLimpo = nome.trim().replace(/\s+/g, ' ');
+      if (!nomeLimpo || !empresa) {
+        throw new Error('Dados invalidos');
+      }
+
+      const existentes = await loadFornecedoresPorEmpresa(empresa);
+      const fornecedorExistente = existentes.find(
+        (fornecedor) => normalizeFornecedorNome(fornecedor.nome) === normalizeFornecedorNome(nomeLimpo)
+      );
+
+      if (fornecedorExistente) {
+        return fornecedorExistente;
+      }
+
+      const { data, error } = await supabase
+        .from('fornecedores')
+        .insert({ nome: nomeLimpo, empresa })
+        .select(fornecedorSelectColumns)
+        .single();
+
+      if (error) throw error;
+      return data as Fornecedor;
+    },
+    onSuccess: (fornecedor) => {
+      queryClient.setQueryData<Fornecedor[]>(
+        ['fornecedores', fornecedor.empresa],
+        (current = []) => {
+          if (current.some((item) => item.id === fornecedor.id)) return current;
+          return [...current, fornecedor].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        }
+      );
+      onValueChange(fornecedor.id);
+      setNovoFornecedorNome('');
+      setAdicionando(false);
+      toast.success('Fornecedor salvo');
+    },
+    onError: () => {
+      toast.error('Erro ao salvar fornecedor');
+    },
+  });
+
+  const handleAdicionarFornecedor = () => {
+    adicionarFornecedorMutation.mutate({ nome: novoFornecedorNome, empresa: empresaSlug });
+  };
+
+  const fornecedorValue = value || FORNECEDOR_NONE;
+  const salvarFornecedorDisabled =
+    !empresaSlug || !novoFornecedorNome.trim() || adicionarFornecedorMutation.isPending;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <Label>Fornecedor</Label>
+          <Select
+            value={fornecedorValue}
+            onValueChange={(selected) =>
+              onValueChange(selected === FORNECEDOR_NONE ? '' : selected)
+            }
+            disabled={!empresaSlug || isLoading}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FORNECEDOR_NONE}>Sem fornecedor</SelectItem>
+              {fornecedores.map((fornecedor) => (
+                <SelectItem key={fornecedor.id} value={fornecedor.id}>
+                  {fornecedor.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => setAdicionando((current) => !current)}
+          disabled={!empresaSlug}
+          aria-label="Adicionar fornecedor"
+          title="Adicionar fornecedor"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {adicionando && (
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <Input
+            value={novoFornecedorNome}
+            onChange={(event) => setNovoFornecedorNome(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (!salvarFornecedorDisabled) handleAdicionarFornecedor();
+              }
+            }}
+            placeholder="Nome do fornecedor"
+            disabled={adicionarFornecedorMutation.isPending}
+          />
+          <Button
+            type="button"
+            onClick={handleAdicionarFornecedor}
+            disabled={salvarFornecedorDisabled}
+          >
+            {adicionarFornecedorMutation.isPending ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ContaFormData {
   descricao: string;
   valor_original: string;
   data_vencimento: string;
   codigo_barras: string;
+  fornecedor_id: string;
 }
 
 interface CriarContaPayload extends ContaFormData {
@@ -74,6 +229,7 @@ export default function ContasAPagarPage() {
     valor_original: '',
     data_vencimento: '',
     codigo_barras: '',
+    fornecedor_id: '',
   });
   const [vencimentos, setVencimentos] = useState<Vencimento[]>([]);
   const [dialogNova, setDialogNova] = useState(false);
@@ -101,10 +257,21 @@ export default function ContasAPagarPage() {
     valor_original: '',
     data_vencimento: '',
     codigo_barras: '',
+    fornecedor_id: '',
   });
 
   const [historicoDialog, setHistoricoDialog] = useState(false);
   const [historico, setHistorico] = useState<Pagamento[]>([]);
+
+  const novaContaEmpresaSlug = isGroupSelection
+    ? novaContaLojaSlug
+    : selectedCompanySlugs[0] || selectedCompanyId;
+  const editContaEmpresaSlug = contaEdit?.empresa || '';
+
+  const handleNovaContaLojaChange = (slug: string) => {
+    setNovaContaLojaSlug(slug);
+    setNovaConta((current) => ({ ...current, fornecedor_id: '' }));
+  };
 
   useEffect(() => {
     const firstStoreSlug = stores[0]?.slug || '';
@@ -123,6 +290,12 @@ export default function ContasAPagarPage() {
       return stores.some((store) => store.slug === current) ? current : 'todas';
     });
   }, [stores, isGroupSelection]);
+
+  useEffect(() => {
+    setNovaConta((current) =>
+      current.fornecedor_id ? { ...current, fornecedor_id: '' } : current
+    );
+  }, [novaContaEmpresaSlug]);
 
   const invalidateFinancialQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
@@ -223,6 +396,7 @@ export default function ContasAPagarPage() {
           total_parcelas: dados.vencimentos.length,
           grupo_parcela_id: grupoId,
           codigo_barras: dados.codigo_barras || null,
+          fornecedor_id: dados.fornecedor_id || null,
         }));
 
         const { error } = await supabase.from('contas').insert(contasParaInserir);
@@ -240,6 +414,7 @@ export default function ContasAPagarPage() {
           total_parcelas: 1,
           grupo_parcela_id: null,
           codigo_barras: dados.codigo_barras || null,
+          fornecedor_id: dados.fornecedor_id || null,
         });
         if (error) throw error;
       }
@@ -253,7 +428,13 @@ export default function ContasAPagarPage() {
       }
       invalidateFinancialQueries();
       setDialogNova(false);
-      setNovaConta({ descricao: '', valor_original: '', data_vencimento: '', codigo_barras: '' });
+      setNovaConta({
+        descricao: '',
+        valor_original: '',
+        data_vencimento: '',
+        codigo_barras: '',
+        fornecedor_id: '',
+      });
       setVencimentos([]);
     },
     onError: () => {
@@ -311,6 +492,7 @@ export default function ContasAPagarPage() {
           valor_total: Number(dados.valor_original),
           vencimento: dados.data_vencimento,
           codigo_barras: dados.codigo_barras || null,
+          fornecedor_id: dados.fornecedor_id || null,
         })
         .eq('id', id);
       if (error) throw error;
@@ -529,7 +711,7 @@ export default function ContasAPagarPage() {
     setContaEdit(conta);
     const { data } = await supabase
       .from('contas')
-      .select('codigo_barras')
+      .select('codigo_barras, fornecedor_id')
       .eq('id', conta.id as string)
       .single();
 
@@ -538,6 +720,7 @@ export default function ContasAPagarPage() {
       valor_original: String(conta.valor_total || ''),
       data_vencimento: conta.vencimento || '',
       codigo_barras: data?.codigo_barras || '',
+      fornecedor_id: data?.fornecedor_id || '',
     });
     setEditDialog(true);
   };
@@ -645,7 +828,7 @@ export default function ContasAPagarPage() {
               {isGroupSelection && (
                 <div>
                   <Label>Loja</Label>
-                  <Select value={novaContaLojaSlug} onValueChange={setNovaContaLojaSlug}>
+                  <Select value={novaContaLojaSlug} onValueChange={handleNovaContaLojaChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a loja" />
                     </SelectTrigger>
@@ -659,6 +842,14 @@ export default function ContasAPagarPage() {
                   </Select>
                 </div>
               )}
+
+              <FornecedorPicker
+                empresaSlug={novaContaEmpresaSlug}
+                value={novaConta.fornecedor_id}
+                onValueChange={(fornecedorId) =>
+                  setNovaConta({ ...novaConta, fornecedor_id: fornecedorId })
+                }
+              />
 
               {/* Campo de vencimento único - só aparece se não há múltiplos vencimentos */}
               {vencimentos.length <= 1 && (
@@ -821,7 +1012,7 @@ export default function ContasAPagarPage() {
                           {slugToName.get(conta.empresa || '') || conta.empresa || '-'}
                         </td>
                       )}
-                      <td className="p-2">-</td>
+                      <td className="p-2">{conta.fornecedor_nome || '-'}</td>
                       <td className="p-2">{conta.descricao}</td>
                       <td className="p-2 text-right">{formatCurrency(Number(conta.valor_total) || 0)}</td>
                       <td className="p-2 text-right">
@@ -980,6 +1171,13 @@ export default function ContasAPagarPage() {
                 }
               />
             </div>
+            <FornecedorPicker
+              empresaSlug={editContaEmpresaSlug}
+              value={editForm.fornecedor_id}
+              onValueChange={(fornecedorId) =>
+                setEditForm({ ...editForm, fornecedor_id: fornecedorId })
+              }
+            />
             <div>
               <Label>Código de Barras</Label>
               <Input
