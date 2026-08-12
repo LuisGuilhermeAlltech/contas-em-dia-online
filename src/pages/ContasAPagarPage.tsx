@@ -57,6 +57,24 @@ const loadFornecedoresPorEmpresa = async (empresaSlug: string): Promise<Forneced
   return (data || []) as Fornecedor[];
 };
 
+const loadFornecedoresPorEmpresas = async (empresaSlugs: string[]): Promise<Fornecedor[]> => {
+  const uniqueSlugs = Array.from(new Set(empresaSlugs.filter(Boolean)));
+  if (!uniqueSlugs.length) return [];
+
+  let query = supabase
+    .from('fornecedores')
+    .select(fornecedorSelectColumns)
+    .order('nome', { ascending: true });
+
+  query = uniqueSlugs.length === 1
+    ? query.eq('empresa', uniqueSlugs[0])
+    : query.in('empresa', uniqueSlugs);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as Fornecedor[];
+};
+
 interface FornecedorPickerProps {
   empresaSlug: string;
   value: string;
@@ -219,6 +237,7 @@ export default function ContasAPagarPage() {
   const [somenteAbertas, setSomenteAbertas] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [lojaFilter, setLojaFilter] = useState('todas');
+  const [fornecedorFilter, setFornecedorFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [periodoInicio, setPeriodoInicio] = useState('');
   const [periodoFim, setPeriodoFim] = useState('');
@@ -267,6 +286,8 @@ export default function ContasAPagarPage() {
     ? novaContaLojaSlug
     : selectedCompanySlugs[0] || selectedCompanyId;
   const editContaEmpresaSlug = contaEdit?.empresa || '';
+  const fornecedorFilterEmpresaSlugs =
+    isGroupSelection && lojaFilter !== 'todas' ? [lojaFilter] : selectedCompanySlugs;
 
   const handleNovaContaLojaChange = (slug: string) => {
     setNovaContaLojaSlug(slug);
@@ -297,6 +318,23 @@ export default function ContasAPagarPage() {
     );
   }, [novaContaEmpresaSlug]);
 
+  const { data: fornecedoresFiltro = [] } = useQuery<Fornecedor[]>({
+    queryKey: ['fornecedores-filtro', fornecedorFilterEmpresaSlugs],
+    queryFn: () => loadFornecedoresPorEmpresas(fornecedorFilterEmpresaSlugs),
+    enabled: fornecedorFilterEmpresaSlugs.length > 0,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  useEffect(() => {
+    if (
+      fornecedorFilter !== 'todos' &&
+      fornecedorFilter !== FORNECEDOR_NONE &&
+      !fornecedoresFiltro.some((fornecedor) => fornecedor.id === fornecedorFilter)
+    ) {
+      setFornecedorFilter('todos');
+    }
+  }, [fornecedorFilter, fornecedoresFiltro]);
+
   const invalidateFinancialQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['contas', selectedCompanyId] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-empresa'] });
@@ -316,6 +354,7 @@ export default function ContasAPagarPage() {
       somenteAbertas,
       statusFilter,
       lojaFilter,
+      fornecedorFilter,
       searchTerm,
       periodoInicio,
       periodoFim,
@@ -344,6 +383,12 @@ export default function ContasAPagarPage() {
 
       if (periodoFim) {
         query = query.lte('vencimento', periodoFim);
+      }
+
+      if (fornecedorFilter === FORNECEDOR_NONE) {
+        query = query.is('fornecedor_id', null);
+      } else if (fornecedorFilter !== 'todos') {
+        query = query.eq('fornecedor_id', fornecedorFilter);
       }
 
       const { data, error } = await query;
@@ -379,6 +424,11 @@ export default function ContasAPagarPage() {
     enabled: selectedCompanySlugs.length > 0,
   });
 
+  const normalizeDescricaoPayload = (descricao: string) => {
+    const descricaoLimpa = descricao.trim().replace(/\s+/g, ' ');
+    return descricaoLimpa || null;
+  };
+
   // Mutation: criar conta
   const criarContaMutation = useMutation({
     mutationFn: async (dados: CriarContaPayload) => {
@@ -386,7 +436,7 @@ export default function ContasAPagarPage() {
       if (dados.vencimentos && dados.vencimentos.length > 1) {
         const grupoId = crypto.randomUUID();
         const contasParaInserir = dados.vencimentos.map((venc: Vencimento) => ({
-          descricao: dados.descricao,
+          descricao: normalizeDescricaoPayload(dados.descricao),
           valor_total: Number(dados.valor_original),
           vencimento: venc.data,
           empresa: dados.empresaSlug,
@@ -404,7 +454,7 @@ export default function ContasAPagarPage() {
       } else {
         // Vencimento único
         const { error } = await supabase.from('contas').insert({
-          descricao: dados.descricao,
+          descricao: normalizeDescricaoPayload(dados.descricao),
           valor_total: Number(dados.valor_original),
           vencimento: dados.data_vencimento,
           empresa: dados.empresaSlug,
@@ -488,7 +538,7 @@ export default function ContasAPagarPage() {
       const { error } = await supabase
         .from('contas')
         .update({
-          descricao: dados.descricao,
+          descricao: normalizeDescricaoPayload(dados.descricao),
           valor_total: Number(dados.valor_original),
           vencimento: dados.data_vencimento,
           codigo_barras: dados.codigo_barras || null,
@@ -614,8 +664,8 @@ export default function ContasAPagarPage() {
 
   const handleCriarConta = () => {
     // Validação básica
-    if (!novaConta.descricao || !novaConta.valor_original) {
-      toast.error('Preencha descrição e valor');
+    if (!novaConta.valor_original) {
+      toast.error('Preencha o valor');
       return;
     }
 
@@ -726,8 +776,8 @@ export default function ContasAPagarPage() {
   };
 
   const handleSalvarEdicao = () => {
-    if (!contaEdit || !editForm.descricao || !editForm.valor_original || !editForm.data_vencimento) {
-      toast.error('Preencha todos os campos');
+    if (!contaEdit || !editForm.valor_original || !editForm.data_vencimento) {
+      toast.error('Preencha valor e vencimento');
       return;
     }
     if (!contaEdit.id) {
@@ -805,11 +855,11 @@ export default function ContasAPagarPage() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Descrição</Label>
+                <Label>Descrição (opcional)</Label>
                 <Input
                   value={novaConta.descricao}
                   onChange={(e) => setNovaConta({ ...novaConta, descricao: e.target.value })}
-                  placeholder="Ex: Aluguel, Fornecedor X, etc."
+                  placeholder="Ex: Aluguel, boleto, etc."
                 />
               </div>
               <div>
@@ -904,8 +954,8 @@ export default function ContasAPagarPage() {
           <div
             className={
               isGroupSelection
-                ? 'grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 [&>*]:min-w-0'
-                : 'grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4 [&>*]:min-w-0'
+                ? 'grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 [&>*]:min-w-0'
+                : 'grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-5 [&>*]:min-w-0'
             }
           >
             <div>
@@ -934,6 +984,25 @@ export default function ContasAPagarPage() {
                 </Select>
               </div>
             )}
+            <div>
+              <Label>Fornecedor</Label>
+              <Select value={fornecedorFilter} onValueChange={setFornecedorFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value={FORNECEDOR_NONE}>Sem fornecedor</SelectItem>
+                  {fornecedoresFiltro.map((fornecedor) => (
+                    <SelectItem key={fornecedor.id} value={fornecedor.id}>
+                      {isGroupSelection
+                        ? `${fornecedor.nome} - ${slugToName.get(fornecedor.empresa) || fornecedor.empresa}`
+                        : fornecedor.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -1013,7 +1082,7 @@ export default function ContasAPagarPage() {
                         </td>
                       )}
                       <td className="p-2">{conta.fornecedor_nome || '-'}</td>
-                      <td className="p-2">{conta.descricao}</td>
+                      <td className="p-2">{conta.descricao || '-'}</td>
                       <td className="p-2 text-right">{formatCurrency(Number(conta.valor_total) || 0)}</td>
                       <td className="p-2 text-right">
                         {formatCurrency(Number(conta.total_pago) || 0)}
@@ -1101,7 +1170,7 @@ export default function ContasAPagarPage() {
           </DialogHeader>
           <div className="space-y-4">
             <p>
-              Conta: <strong>{contaSelecionada?.descricao}</strong>
+              Conta: <strong>{contaSelecionada?.descricao || '-'}</strong>
             </p>
             <p>
               Vencimento: <strong>{formatDate(contaSelecionada?.vencimento)}</strong>
@@ -1144,7 +1213,7 @@ export default function ContasAPagarPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Descrição</Label>
+              <Label>Descrição (opcional)</Label>
               <Input
                 value={editForm.descricao}
                 onChange={(e) => setEditForm({ ...editForm, descricao: e.target.value })}
@@ -1201,7 +1270,7 @@ export default function ContasAPagarPage() {
           </DialogHeader>
           <div className="space-y-2">
             <p>
-              Conta: <strong>{contaSelecionada?.descricao}</strong>
+              Conta: <strong>{contaSelecionada?.descricao || '-'}</strong>
             </p>
             {historico.length === 0 ? (
               <p className="text-muted-foreground">Nenhum pagamento registrado.</p>
@@ -1297,7 +1366,7 @@ export default function ContasAPagarPage() {
         open={viewerOpen}
         onOpenChange={setViewerOpen}
         pagamentoId={viewerPagamentoId}
-        contaDescricao={contaSelecionada?.descricao}
+        contaDescricao={contaSelecionada?.descricao || undefined}
       />
     </div>
   );
